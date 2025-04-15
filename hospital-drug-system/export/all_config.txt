@@ -1,0 +1,246 @@
+﻿==== src\main\resources\static\node_modules\call-bind-apply-helpers\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/call-bind-apply-helpers
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with up to 4 custom sponsorship URLs e.g., ['link1', 'link2']
+
+==== src\main\resources\static\node_modules\dunder-proto\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/dunder-proto
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with up to 4 custom sponsorship URLs e.g., ['link1', 'link2']
+
+==== src\main\resources\static\node_modules\es-define-property\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/es-define-property
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with a single custom sponsorship URL
+
+==== src\main\resources\static\node_modules\es-errors\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/es-errors
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with a single custom sponsorship URL
+
+==== src\main\resources\static\node_modules\es-object-atoms\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/es-object
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with a single custom sponsorship URL
+
+==== src\main\resources\static\node_modules\function-bind\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/function-bind
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with up to 4 custom sponsorship URLs e.g., ['link1', 'link2']
+
+==== src\main\resources\static\node_modules\get-intrinsic\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/get-intrinsic
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with up to 4 custom sponsorship URLs e.g., ['link1', 'link2']
+
+==== src\main\resources\static\node_modules\get-proto\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/get-proto
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with up to 4 custom sponsorship URLs e.g., ['link1', 'link2']
+
+==== src\main\resources\static\node_modules\gopd\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/gopd
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with up to 4 custom sponsorship URLs e.g., ['link1', 'link2']
+
+==== src\main\resources\static\node_modules\has-symbols\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/has-symbols
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with up to 4 custom sponsorship URLs e.g., ['link1', 'link2']
+
+==== src\main\resources\static\node_modules\has-tostringtag\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/has-tostringtag
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with up to 4 custom sponsorship URLs e.g., ['link1', 'link2']
+
+==== src\main\resources\static\node_modules\hasown\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/hasown
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with a single custom sponsorship URL
+
+==== src\main\resources\static\node_modules\math-intrinsics\.github\FUNDING.yml ====
+# These are supported funding model platforms
+
+github: [ljharb]
+patreon: # Replace with a single Patreon username
+open_collective: # Replace with a single Open Collective username
+ko_fi: # Replace with a single Ko-fi username
+tidelift: npm/math-intrinsics
+community_bridge: # Replace with a single Community Bridge project-name e.g., cloud-foundry
+liberapay: # Replace with a single Liberapay username
+issuehunt: # Replace with a single IssueHunt username
+otechie: # Replace with a single Otechie username
+custom: # Replace with a single custom sponsorship URL
+
+==== src\main\resources\static\node_modules\proxy-from-env\.travis.yml ====
+language: node_js
+node_js:
+  - node
+  - lts/*
+script:
+  - npm run lint
+  # test-coverage will also run the tests, but does not print helpful output upon test failure.
+  # So we also run the tests separately.
+  - npm run test
+  - npm run test-coverage && cat coverage/lcov.info | ./node_modules/.bin/coveralls && rm -rf coverage
+
+==== src\main\resources\application.properties ====
+# 鏁版嵁婧愰厤缃?
+spring.datasource.url=jdbc:h2:mem:hospitaldb;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=password
+
+# JPA閰嶇疆
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.connection.characterEncoding=utf-8
+spring.jpa.properties.hibernate.connection.CharSet=utf-8
+spring.jpa.properties.hibernate.connection.useUnicode=true
+
+# 瀛楃缂栫爜閰嶇疆
+spring.http.encoding.charset=UTF-8
+spring.http.encoding.enabled=true
+spring.http.encoding.force=true
+server.servlet.encoding.charset=UTF-8
+server.servlet.encoding.enabled=true
+server.servlet.encoding.force=true
+
+# H2 鎺у埗鍙伴厤缃?
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+
+# 鏈嶅姟鍣ㄩ厤缃?
+server.port=8082
+
+# 鏃ュ織閰嶇疆
+logging.level.org.springframework.web=INFO
+logging.level.org.hibernate=ERROR
+logging.level.com.example.hospital=DEBUG
+
+# 闈欐€佽祫婧愰厤缃?
+spring.web.resources.static-locations=classpath:/static/dist/
+spring.mvc.static-path-pattern=/**
+spring.web.resources.chain.strategy.content.enabled=true
+spring.web.resources.chain.strategy.content.paths=/**
+
+# 寮€鍙戠幆澧冮厤缃?
+spring.devtools.restart.enabled=true
+spring.devtools.livereload.enabled=true
+
+# 鍏佽寰幆渚濊禆锛堜綔涓烘渶鍚庣殑瑙ｅ喅鏂规锛?
+spring.main.allow-circular-references=true
+
+# JWT 閰嶇疆
+# JWT浠ょ墝杩囨湡鏃堕棿锛?4灏忔椂锛?
+jwt.expiration=86400000 
+

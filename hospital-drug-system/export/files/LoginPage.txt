@@ -1,0 +1,137 @@
+﻿==========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\resources\static\js\LoginPage.vue
+==========================================================================
+
+<template>
+  <div class="login-container">
+    <el-card class="login-card">
+      <div class="login-header">
+        <h2>医院药品管理系统</h2>
+      </div>
+      
+      <el-form ref="loginFormRef" :model="loginForm" :rules="rules" label-width="0">
+        <el-form-item prop="username">
+          <el-input 
+            v-model="loginForm.username" 
+            placeholder="用户名" 
+            prefix-icon="User"
+            clearable
+          />
+        </el-form-item>
+        
+        <el-form-item prop="password">
+          <el-input 
+            v-model="loginForm.password" 
+            type="password" 
+            placeholder="密码" 
+            prefix-icon="Lock"
+            show-password
+            clearable
+            @keyup.enter="handleLogin"
+          />
+        </el-form-item>
+        
+        <el-form-item>
+          <el-button 
+            type="primary" 
+            class="login-button" 
+            :loading="loading" 
+            @click="handleLogin"
+          >
+            登录
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive } from 'vue'
+import { ElMessage } from 'element-plus'
+import { User, Lock } from '@element-plus/icons-vue'
+import axios from 'axios'
+
+const emit = defineEmits(['login-success'])
+
+// 登录表单
+const loginFormRef = ref(null)
+const loginForm = reactive({
+  username: '',
+  password: ''
+})
+
+// 表单验证规则
+const rules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' }
+  ]
+}
+
+// 登录状态
+const loading = ref(false)
+
+// 登录处理
+const handleLogin = () => {
+  if (!loginFormRef.value) return
+  
+  loginFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    
+    loading.value = true
+    
+    try {
+      const response = await axios.post('/auth/login', loginForm)
+      
+      // 登录成功
+      if (response.data && response.data.status === 'success') {
+        // 存储用户信息到本地存储
+        localStorage.setItem('user', JSON.stringify(response.data.user))
+        
+        ElMessage.success('登录成功')
+        
+        // 通知父组件登录成功
+        emit('login-success', response.data.user)
+      } else {
+        ElMessage.error(response.data?.message || '登录失败')
+      }
+    } catch (error) {
+      console.error('登录失败:', error)
+      ElMessage.error(error.response?.data?.message || '登录失败，请检查用户名和密码')
+    } finally {
+      loading.value = false
+    }
+  })
+}
+</script>
+
+<style scoped>
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #f0f2f5;
+}
+
+.login-card {
+  width: 380px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.login-header h2 {
+  color: #409EFF;
+  font-weight: 600;
+}
+
+.login-button {
+  width: 100%;
+}
+</style> 

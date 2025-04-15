@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>医院药品管理系统 - 登录测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            min-height: 100px;
+        }
+        .check-form {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>登录测试</h1>
+    <div class="container">
+        <div class="form-group">
+            <label for="username">用户名:</label>
+            <input type="text" id="username" value="admin">
+        </div>
+        <div class="form-group">
+            <label for="password">密码:</label>
+            <input type="password" id="password" value="admin123">
+        </div>
+        <button onclick="login()">登录</button>
+        
+        <div class="response" id="loginResponse"></div>
+        
+        <div class="check-form">
+            <h3>检查用户信息</h3>
+            <div class="form-group">
+                <label for="checkUsername">用户名:</label>
+                <input type="text" id="checkUsername" value="admin">
+            </div>
+            <button onclick="checkUser()">检查</button>
+            <div class="response" id="checkResponse"></div>
+        </div>
+        
+        <div class="check-form">
+            <h3>测试密码加密</h3>
+            <div class="form-group">
+                <label for="testPassword">密码:</label>
+                <input type="text" id="testPassword" value="admin123">
+            </div>
+            <button onclick="testPassword()">测试</button>
+            <div class="response" id="passwordResponse"></div>
+        </div>
+        
+        <div class="check-form">
+            <h3>重置管理员密码</h3>
+            <button onclick="resetAdminPassword()">重置为 admin123</button>
+            <div class="response" id="resetResponse"></div>
+        </div>
+        
+        <div class="check-form">
+            <h3>测试登录接口</h3>
+            <div class="form-group">
+                <label for="testUsername">用户名:</label>
+                <input type="text" id="testUsername" value="admin">
+            </div>
+            <div class="form-group">
+                <label for="testLoginPassword">密码:</label>
+                <input type="password" id="testLoginPassword" value="admin123">
+            </div>
+            <button onclick="testLoginApi()">登录</button>
+            <div class="response" id="testLoginResponse"></div>
+        </div>
+    </div>
+    
+    <script>
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const responseElement = document.getElementById('loginResponse');
+            
+            try {
+                const response = await fetch('http://localhost:8082/api/users/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                responseElement.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                responseElement.style.backgroundColor = response.ok ? '#e8f5e9' : '#ffebee';
+            } catch (error) {
+                responseElement.innerHTML = '错误: ' + error.message;
+                responseElement.style.backgroundColor = '#ffebee';
+            }
+        }
+        
+        async function checkUser() {
+            const username = document.getElementById('checkUsername').value;
+            const responseElement = document.getElementById('checkResponse');
+            
+            try {
+                const response = await fetch(`http://localhost:8082/api/users/check?username=${username}`);
+                const data = await response.json();
+                
+                responseElement.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                responseElement.style.backgroundColor = response.ok ? '#e8f5e9' : '#ffebee';
+            } catch (error) {
+                responseElement.innerHTML = '错误: ' + error.message;
+                responseElement.style.backgroundColor = '#ffebee';
+            }
+        }
+        
+        async function testPassword() {
+            const password = document.getElementById('testPassword').value;
+            const responseElement = document.getElementById('passwordResponse');
+            
+            try {
+                const response = await fetch(`http://localhost:8082/api/test/password?rawPassword=${password}`);
+                const data = await response.json();
+                
+                responseElement.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                responseElement.style.backgroundColor = '#e8f5e9';
+            } catch (error) {
+                responseElement.innerHTML = '错误: ' + error.message;
+                responseElement.style.backgroundColor = '#ffebee';
+            }
+        }
+        
+        async function resetAdminPassword() {
+            const responseElement = document.getElementById('resetResponse');
+            
+            try {
+                const response = await fetch('http://localhost:8082/api/test/reset-admin');
+                const data = await response.json();
+                
+                responseElement.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                responseElement.style.backgroundColor = data.status === 'success' ? '#e8f5e9' : '#ffebee';
+            } catch (error) {
+                responseElement.innerHTML = '错误: ' + error.message;
+                responseElement.style.backgroundColor = '#ffebee';
+            }
+        }
+        
+        async function testLoginApi() {
+            const username = document.getElementById('testUsername').value;
+            const password = document.getElementById('testLoginPassword').value;
+            const responseElement = document.getElementById('testLoginResponse');
+            
+            try {
+                const response = await fetch('http://localhost:8082/api/test/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                responseElement.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                responseElement.style.backgroundColor = data.status === 'success' ? '#e8f5e9' : '#ffebee';
+            } catch (error) {
+                responseElement.innerHTML = '错误: ' + error.message;
+                responseElement.style.backgroundColor = '#ffebee';
+            }
+        }
+    </script>
+</body>
+</html> 

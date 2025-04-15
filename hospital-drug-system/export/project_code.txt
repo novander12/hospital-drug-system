@@ -1,0 +1,2223 @@
+﻿鍖婚櫌鑽搧绠＄悊绯荤粺 - 浠ｇ爜瀵煎嚭
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\HospitalDrugSystemApplication.java
+===========================================================================
+package com.example.hospital;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class HospitalDrugSystemApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(HospitalDrugSystemApplication.class, args);
+    }
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\config\DataInitializer.java
+===========================================================================
+package com.example.hospital.config;
+
+import com.example.hospital.model.User;
+import com.example.hospital.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DataInitializer implements CommandLineRunner {
+
+    @Autowired
+    private UserService userService;
+    
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Override
+    public void run(String... args) throws Exception {
+        // 检查是否已有管理员用户
+        User existingAdmin = userService.findByUsername("admin");
+        if (existingAdmin == null) {
+            // 创建默认管理员用户
+            User adminUser = new User();
+            adminUser.setUsername("admin");
+            String rawPassword = "admin123";
+            adminUser.setPassword(rawPassword);
+            adminUser.setRole("ADMIN");
+            User savedAdmin = userService.createUser(adminUser);
+            
+            // 测试密码是否匹配
+            boolean passwordMatches = passwordEncoder.matches(rawPassword, savedAdmin.getPassword());
+            
+            System.out.println("已创建默认管理员用户: admin/admin123");
+            System.out.println("加密后密码: " + savedAdmin.getPassword());
+            System.out.println("密码匹配测试: " + passwordMatches);
+        } else {
+            System.out.println("已存在管理员用户: " + existingAdmin.getUsername());
+            // 尝试使用已知密码进行匹配测试
+            boolean passwordMatches = passwordEncoder.matches("admin123", existingAdmin.getPassword());
+            System.out.println("密码匹配测试: " + passwordMatches);
+        }
+        
+        // 检查是否已有普通用户
+        if (userService.findByUsername("user") == null) {
+            // 创建默认普通用户
+            User normalUser = new User();
+            normalUser.setUsername("user");
+            String rawPassword = "user123";
+            normalUser.setPassword(rawPassword);
+            normalUser.setRole("USER");
+            User savedUser = userService.createUser(normalUser);
+            
+            System.out.println("已创建默认普通用户: user/user123");
+            System.out.println("加密后密码: " + savedUser.getPassword());
+        }
+    }
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\config\SecurityConfig.java
+===========================================================================
+package com.example.hospital.config;
+
+import com.example.hospital.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+    private final UserRepository userRepository;
+
+    @Autowired
+    public SecurityConfig(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+    
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+            .cors().and().csrf().disable()  // 在生产环境中应启用CSRF保护
+            .authorizeRequests()
+                .antMatchers("/api/users/login", "/api/users/register", "/api/users/check").permitAll()
+                .antMatchers("/api/test/**").permitAll()
+                .antMatchers("/auth/**").permitAll()
+                .antMatchers("/api/drugs/admin/**").hasRole("ADMIN")
+                .antMatchers("/api/drugs/**").permitAll()
+                .antMatchers("/", "/js/**", "/css/**", "/assets/**", "/h2-console/**").permitAll()
+                .anyRequest().authenticated()
+                .and()
+            .formLogin()
+                .disable()
+            .logout()
+                .permitAll()
+                .and()
+            .headers().frameOptions().disable(); // 为了H2控制台可以正常访问
+    }
+    
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:8081", "http://localhost:63342", "http://127.0.0.1:5500"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(false);
+        configuration.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+    
+    @Override
+    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+        auth.userDetailsService(username -> {
+            com.example.hospital.model.User user = userRepository.findByUsername(username);
+            if (user == null) {
+                throw new org.springframework.security.core.userdetails.UsernameNotFoundException("用户不存在");
+            }
+            return new org.springframework.security.core.userdetails.User(
+                user.getUsername(),
+                user.getPassword(),
+                java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + user.getRole()))
+            );
+        }).passwordEncoder(passwordEncoder());
+    }
+    
+    @Bean
+    @Override
+    public AuthenticationManager authenticationManagerBean() throws Exception {
+        return super.authenticationManagerBean();
+    }
+    
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\config\WebConfig.java
+===========================================================================
+package com.example.hospital.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowedOrigins("*")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
+                .maxAge(3600);
+    }
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\controller\AuthController.java
+===========================================================================
+package com.example.hospital.controller;
+
+import com.example.hospital.model.User;
+import com.example.hospital.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * 认证控制器，处理用户登录等认证相关操作
+ */
+@RestController
+@RequestMapping("/auth")
+public class AuthController {
+
+    @Autowired
+    private UserService userService;
+
+    /**
+     * 用户登录接口
+     * @param loginRequest 包含用户名和密码的请求体
+     * @return 登录结果
+     */
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody Map<String, String> loginRequest) {
+        String username = loginRequest.get("username");
+        String password = loginRequest.get("password");
+        
+        // 验证请求参数
+        if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "用户名和密码不能为空");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+        
+        // 验证用户身份
+        User user = userService.authenticate(username, password);
+        
+        if (user != null) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "登录成功");
+            
+            // 创建用户信息(不包含密码)
+            Map<String, Object> userInfo = new HashMap<>();
+            userInfo.put("id", user.getId());
+            userInfo.put("username", user.getUsername());
+            userInfo.put("role", user.getRole());
+            response.put("user", userInfo);
+            
+            return ResponseEntity.ok(response);
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "用户名或密码错误");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+    }
+    
+    /**
+     * 检查用户权限
+     * @param username 用户名
+     * @return 权限信息
+     */
+    @GetMapping("/check-permission")
+    public ResponseEntity<?> checkPermission(@RequestParam String username) {
+        Map<String, Object> response = new HashMap<>();
+        
+        boolean isAdmin = userService.isAdmin(username);
+        response.put("isAdmin", isAdmin);
+        
+        if (isAdmin) {
+            response.put("permissions", "full");
+            response.put("message", "管理员拥有所有操作权限");
+        } else {
+            response.put("permissions", "read-only");
+            response.put("message", "普通用户仅有查看权限");
+        }
+        
+        return ResponseEntity.ok(response);
+    }
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\controller\DrugController.java
+===========================================================================
+package com.example.hospital.controller;
+
+import com.example.hospital.model.Drug;
+import com.example.hospital.repository.DrugRepository;
+import com.example.hospital.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+
+import java.net.URI;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/api/drugs")
+public class DrugController {
+
+    @Autowired
+    private DrugRepository drugRepository;
+    
+    @Autowired
+    private UserService userService;
+
+    /**
+     * 获取所有药品 (所有用户都可访问)
+     */
+    @GetMapping
+    public ResponseEntity<List<Drug>> getAllDrugs() {
+        List<Drug> drugs = drugRepository.findAll();
+        return ResponseEntity.ok(drugs);
+    }
+
+    /**
+     * 根据ID获取药品 (所有用户都可访问)
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getDrugById(@PathVariable Long id) {
+        Optional<Drug> drug = drugRepository.findById(id);
+        if (drug.isPresent()) {
+            return ResponseEntity.ok(drug.get());
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "药品不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
+    /**
+     * 创建新药品 (仅管理员可访问)
+     */
+    @PostMapping
+    public ResponseEntity<?> createDrug(@RequestBody Drug drug, @RequestHeader("X-Username") String username) {
+        // 检查用户权限
+        if (!userService.isAdmin(username)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "权限不足，仅管理员可创建药品");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        Drug savedDrug = drugRepository.save(drug);
+        
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(savedDrug.getId())
+                .toUri();
+        
+        return ResponseEntity.created(location).body(savedDrug);
+    }
+
+    /**
+     * 批量创建药品 (仅管理员可访问)
+     */
+    @PostMapping("/batch")
+    public ResponseEntity<?> createDrugs(@RequestBody List<Drug> drugs, @RequestHeader("X-Username") String username) {
+        // 检查用户权限
+        if (!userService.isAdmin(username)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "权限不足，仅管理员可批量创建药品");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        List<Drug> savedDrugs = drugRepository.saveAll(drugs);
+        return ResponseEntity.status(HttpStatus.CREATED).body(savedDrugs);
+    }
+
+    /**
+     * 更新药品信息 (仅管理员可访问)
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateDrug(@PathVariable Long id, @RequestBody Drug drugDetails, @RequestHeader("X-Username") String username) {
+        // 检查用户权限
+        if (!userService.isAdmin(username)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "权限不足，仅管理员可更新药品");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        Optional<Drug> optionalDrug = drugRepository.findById(id);
+        if (optionalDrug.isPresent()) {
+            Drug drug = optionalDrug.get();
+            drug.setName(drugDetails.getName());
+            drug.setSpec(drugDetails.getSpec());
+            drug.setStock(drugDetails.getStock());
+            drug.setExpirationDate(drugDetails.getExpirationDate());
+            drug.setSupplier(drugDetails.getSupplier());
+            drug.setCategory(drugDetails.getCategory());
+            Drug updatedDrug = drugRepository.save(drug);
+            return ResponseEntity.ok(updatedDrug);
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "药品不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
+    /**
+     * 局部更新药品信息 (仅管理员可访问)
+     */
+    @PatchMapping("/{id}")
+    public ResponseEntity<?> partialUpdateDrug(@PathVariable Long id, @RequestBody Map<String, Object> updates, @RequestHeader("X-Username") String username) {
+        // 检查用户权限
+        if (!userService.isAdmin(username)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "权限不足，仅管理员可更新药品");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        Optional<Drug> optionalDrug = drugRepository.findById(id);
+        if (optionalDrug.isPresent()) {
+            Drug drug = optionalDrug.get();
+            
+            // 根据提供的字段进行更新
+            if (updates.containsKey("name")) {
+                drug.setName((String) updates.get("name"));
+            }
+            if (updates.containsKey("spec")) {
+                drug.setSpec((String) updates.get("spec"));
+            }
+            if (updates.containsKey("stock")) {
+                drug.setStock((Integer) updates.get("stock"));
+            }
+            if (updates.containsKey("supplier")) {
+                drug.setSupplier((String) updates.get("supplier"));
+            }
+            if (updates.containsKey("category")) {
+                drug.setCategory((String) updates.get("category"));
+            }
+            if (updates.containsKey("expirationDate")) {
+                drug.setExpirationDate(java.time.LocalDate.parse((String) updates.get("expirationDate")));
+            }
+            
+            Drug updatedDrug = drugRepository.save(drug);
+            return ResponseEntity.ok(updatedDrug);
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "药品不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
+    /**
+     * 删除药品 (仅管理员可访问)
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteDrug(@PathVariable Long id, @RequestHeader("X-Username") String username) {
+        // 检查用户权限
+        if (!userService.isAdmin(username)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "权限不足，仅管理员可删除药品");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        Optional<Drug> optionalDrug = drugRepository.findById(id);
+        if (optionalDrug.isPresent()) {
+            drugRepository.deleteById(id);
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "药品已删除");
+            return ResponseEntity.ok(response);
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "药品不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+    
+    /**
+     * 批量删除药品 (仅管理员可访问)
+     */
+    @DeleteMapping("/batch")
+    public ResponseEntity<?> deleteDrugs(@RequestBody List<Long> ids, @RequestHeader("X-Username") String username) {
+        // 检查用户权限
+        if (!userService.isAdmin(username)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "权限不足，仅管理员可批量删除药品");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        ids.forEach(id -> {
+            if (drugRepository.existsById(id)) {
+                drugRepository.deleteById(id);
+            }
+        });
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "已批量删除药品");
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 根据药品名称进行模糊搜索 (所有用户都可访问)
+     * @param name 药品名称关键词
+     * @return 匹配的药品列表
+     */
+    @GetMapping("/search")
+    public ResponseEntity<?> searchDrugsByName(@RequestParam String name) {
+        if (name == null || name.trim().isEmpty()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "搜索关键词不能为空");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        List<Drug> matchedDrugs = drugRepository.findByNameContainingIgnoreCase(name.trim());
+        
+        Map<String, Object> response = new HashMap<>();
+        if (matchedDrugs.isEmpty()) {
+            response.put("status", "info");
+            response.put("message", "未找到匹配的药品");
+        } else {
+            response.put("status", "success");
+            response.put("message", "找到" + matchedDrugs.size() + "条匹配记录");
+        }
+        response.put("drugs", matchedDrugs);
+        
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 查询库存低于50的药品 (所有用户都可访问)
+     * @return 库存低的药品列表
+     */
+    @GetMapping("/low-stock")
+    public ResponseEntity<?> getLowStockDrugs() {
+        List<Drug> lowStockDrugs = drugRepository.findByStockLessThan(50);
+        
+        Map<String, Object> response = new HashMap<>();
+        if (lowStockDrugs.isEmpty()) {
+            response.put("status", "info");
+            response.put("message", "没有库存低于50的药品");
+        } else {
+            response.put("status", "warning");
+            response.put("message", "发现" + lowStockDrugs.size() + "种药品库存低于50");
+        }
+        response.put("drugs", lowStockDrugs);
+        
+        return ResponseEntity.ok(response);
+    }
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\controller\StatisticsController.java
+===========================================================================
+package com.example.hospital.controller;
+
+import com.example.hospital.repository.DrugRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 统计数据控制器，提供各类数据统计接口
+ */
+@RestController
+@RequestMapping("/api/stats")
+public class StatisticsController {
+
+    @Autowired
+    private DrugRepository drugRepository;
+
+    /**
+     * 统计各类药品数量
+     * @return 各类药品数量统计
+     */
+    @GetMapping("/category")
+    public ResponseEntity<?> getDrugCategoryStats() {
+        List<Object[]> categoryResults = drugRepository.countByCategory();
+        
+        // 将结果转换为前端友好的格式
+        List<Map<String, Object>> categories = new ArrayList<>();
+        int totalDrugs = 0;
+        
+        for (Object[] result : categoryResults) {
+            String category = (String) result[0];
+            Long count = (Long) result[1];
+            totalDrugs += count;
+            
+            // 如果类别为null，替换为"未分类"
+            if (category == null || category.trim().isEmpty()) {
+                category = "未分类";
+            }
+            
+            Map<String, Object> categoryData = new HashMap<>();
+            categoryData.put("name", category);
+            categoryData.put("count", count);
+            categories.add(categoryData);
+        }
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "共统计" + totalDrugs + "种药品，涵盖" + categories.size() + "个类别");
+        response.put("categories", categories);
+        response.put("total", totalDrugs);
+        
+        return ResponseEntity.ok(response);
+    }
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\controller\TestController.java
+===========================================================================
+package com.example.hospital.controller;
+
+import com.example.hospital.model.User;
+import com.example.hospital.repository.UserRepository;
+import com.example.hospital.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/test")
+public class TestController {
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    
+    @Autowired
+    private UserService userService;
+    
+    @Autowired
+    private UserRepository userRepository;
+
+    @GetMapping("/password")
+    public Map<String, Object> testPassword(@RequestParam(defaultValue = "admin123") String rawPassword) {
+        Map<String, Object> result = new HashMap<>();
+        
+        // 加密密码
+        String encodedPassword = passwordEncoder.encode(rawPassword);
+        
+        // 检查是否匹配
+        boolean matches = passwordEncoder.matches(rawPassword, encodedPassword);
+        
+        // 固定的加密密码用于测试
+        String fixedEncodedPassword = "$2a$10$QUARTc5q2yrBL3nEKRH1WOqsW0.UNzfO0n/2GbkxGKbVJllSqzJna";
+        boolean matchesFixed = passwordEncoder.matches(rawPassword, fixedEncodedPassword);
+        
+        result.put("rawPassword", rawPassword);
+        result.put("encodedPassword", encodedPassword);
+        result.put("passwordLength", encodedPassword.length());
+        result.put("matches", matches);
+        result.put("fixedEncodedPassword", fixedEncodedPassword);
+        result.put("matchesFixed", matchesFixed);
+        
+        return result;
+    }
+    
+    @GetMapping("/reset-admin")
+    public Map<String, Object> resetAdminPassword() {
+        Map<String, Object> result = new HashMap<>();
+        
+        User admin = userService.findByUsername("admin");
+        if (admin != null) {
+            // 直接设置为固定的加密密码
+            String originalPassword = "admin123";
+            String encodedPassword = passwordEncoder.encode(originalPassword);
+            admin.setPassword(encodedPassword);
+            userRepository.save(admin);
+            
+            result.put("status", "success");
+            result.put("message", "管理员密码已重置为 admin123");
+            result.put("encodedPassword", encodedPassword);
+            result.put("passwordLength", encodedPassword.length());
+            result.put("matches", passwordEncoder.matches(originalPassword, encodedPassword));
+        } else {
+            result.put("status", "error");
+            result.put("message", "找不到管理员用户");
+        }
+        
+        return result;
+    }
+    
+    @PostMapping("/login")
+    public Map<String, Object> testLogin(@RequestBody Map<String, String> loginRequest) {
+        Map<String, Object> result = new HashMap<>();
+        
+        String username = loginRequest.get("username");
+        String password = loginRequest.get("password");
+        
+        result.put("username", username);
+        
+        User user = userRepository.findByUsername(username);
+        if (user != null) {
+            result.put("userFound", true);
+            result.put("encodedPassword", user.getPassword());
+            result.put("passwordLength", user.getPassword().length());
+            
+            boolean matches = passwordEncoder.matches(password, user.getPassword());
+            result.put("passwordMatches", matches);
+            
+            if (matches) {
+                result.put("status", "success");
+                result.put("message", "登录成功");
+                
+                Map<String, Object> userInfo = new HashMap<>();
+                userInfo.put("id", user.getId());
+                userInfo.put("username", user.getUsername());
+                userInfo.put("role", user.getRole());
+                result.put("user", userInfo);
+            } else {
+                result.put("status", "error");
+                result.put("message", "密码不匹配");
+            }
+        } else {
+            result.put("userFound", false);
+            result.put("status", "error");
+            result.put("message", "用户不存在");
+        }
+        
+        return result;
+    }
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\controller\UserController.java
+===========================================================================
+package com.example.hospital.controller;
+
+import com.example.hospital.model.User;
+import com.example.hospital.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/users")
+public class UserController {
+
+    @Autowired
+    private UserService userService;
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody Map<String, String> loginRequest) {
+        String username = loginRequest.get("username");
+        String password = loginRequest.get("password");
+        
+        System.out.println("尝试登录: 用户名=" + username + ", 密码长度=" + (password != null ? password.length() : 0));
+        
+        User user = userService.authenticate(username, password);
+        
+        if (user != null) {
+            System.out.println("登录成功: " + user);
+            Map<String, Object> response = createSuccessResponse("登录成功", user);
+            return ResponseEntity.ok(response);
+        } else {
+            System.out.println("登录失败: 用户名或密码错误");
+            return ResponseEntity.badRequest().body(createErrorResponse("用户名或密码错误"));
+        }
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody User user) {
+        // 检查用户名是否已存在
+        if (userService.findByUsername(user.getUsername()) != null) {
+            return ResponseEntity.badRequest().body(createErrorResponse("用户名已存在"));
+        }
+        
+        // 使用Service层创建用户
+        User savedUser = userService.createUser(user);
+        
+        Map<String, Object> response = createSuccessResponse("注册成功", savedUser);
+        return ResponseEntity.ok(response);
+    }
+    
+    @GetMapping("/check")
+    public ResponseEntity<?> checkUser(@RequestParam String username) {
+        User user = userService.findByUsername(username);
+        if (user != null) {
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("id", user.getId());
+            userData.put("username", user.getUsername());
+            userData.put("role", user.getRole());
+            userData.put("passwordLength", user.getPassword().length());
+            
+            return ResponseEntity.ok(userData);
+        } else {
+            return ResponseEntity.badRequest().body(createErrorResponse("用户不存在"));
+        }
+    }
+    
+    /**
+     * 创建成功响应
+     */
+    private Map<String, Object> createSuccessResponse(String message, Object data) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", message);
+        response.put("data", data);
+        return response;
+    }
+    
+    /**
+     * 创建错误响应
+     */
+    private Map<String, Object> createErrorResponse(String message) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "error");
+        response.put("message", message);
+        return response;
+    }
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\model\Drug.java
+===========================================================================
+package com.example.hospital.model;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import java.time.LocalDate;
+
+@Entity
+public class Drug {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String name;
+    private String spec;
+    private Integer stock;
+    private LocalDate expirationDate;
+    private String supplier;
+    private String category; // 药品类别，如：抗生素、解热镇痛、维生素等
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getSpec() {
+        return spec;
+    }
+
+    public void setSpec(String spec) {
+        this.spec = spec;
+    }
+
+    public Integer getStock() {
+        return stock;
+    }
+
+    public void setStock(Integer stock) {
+        this.stock = stock;
+    }
+
+    public LocalDate getExpirationDate() {
+        return expirationDate;
+    }
+
+    public void setExpirationDate(LocalDate expirationDate) {
+        this.expirationDate = expirationDate;
+    }
+
+    public String getSupplier() {
+        return supplier;
+    }
+
+    public void setSupplier(String supplier) {
+        this.supplier = supplier;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\model\User.java
+===========================================================================
+package com.example.hospital.model;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+@Entity
+@Table(name = "users")
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String username;
+    private String password;
+    private String role;
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+    
+    @Override
+    public String toString() {
+        return "User{" +
+                "id=" + id +
+                ", username='" + username + '\'' +
+                ", role='" + role + '\'' +
+                '}';
+    }
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\repository\DrugRepository.java
+===========================================================================
+package com.example.hospital.repository;
+
+import com.example.hospital.model.Drug;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Map;
+
+@Repository
+public interface DrugRepository extends JpaRepository<Drug, Long> {
+    Drug findByName(String name);
+    
+    /**
+     * 根据药品名称进行模糊查询
+     * @param keyword 搜索关键词
+     * @return 匹配的药品列表
+     */
+    @Query("SELECT d FROM Drug d WHERE LOWER(d.name) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    List<Drug> findByNameContainingIgnoreCase(@Param("keyword") String keyword);
+    
+    /**
+     * 查询库存低于指定阈值的药品
+     * @param threshold 库存阈值
+     * @return 库存低于阈值的药品列表
+     */
+    @Query("SELECT d FROM Drug d WHERE d.stock < :threshold ORDER BY d.stock ASC")
+    List<Drug> findByStockLessThan(@Param("threshold") Integer threshold);
+    
+    /**
+     * 统计每个类别的药品数量
+     * @return 每个类别及其对应的药品数量
+     */
+    @Query("SELECT d.category as category, COUNT(d) as count FROM Drug d GROUP BY d.category")
+    List<Object[]> countByCategory();
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\repository\UserRepository.java
+===========================================================================
+package com.example.hospital.repository;
+
+import com.example.hospital.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+    User findByUsername(String username);
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\service\UserService.java
+===========================================================================
+package com.example.hospital.service;
+
+import com.example.hospital.model.User;
+import com.example.hospital.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    
+    @Autowired
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+    
+    /**
+     * 根据用户名查找用户
+     * @param username 用户名
+     * @return 找到的用户，如果不存在则返回null
+     */
+    public User findByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+    
+    /**
+     * 验证用户密码是否正确
+     * @param username 用户名
+     * @param password 密码
+     * @return 如果验证成功返回用户对象，否则返回null
+     */
+    public User authenticate(String username, String password) {
+        User user = findByUsername(username);
+        System.out.println("验证用户: " + username);
+        System.out.println("找到用户: " + (user != null ? user.toString() : "null"));
+        
+        if (user != null) {
+            boolean matches = passwordEncoder.matches(password, user.getPassword());
+            System.out.println("密码匹配结果: " + matches);
+            System.out.println("数据库密码长度: " + user.getPassword().length());
+            if (matches) {
+                return user;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * 检查用户是否有管理员权限
+     * @param username 用户名
+     * @return 如果是管理员返回true，否则返回false
+     */
+    public boolean isAdmin(String username) {
+        User user = findByUsername(username);
+        return user != null && "ADMIN".equals(user.getRole());
+    }
+    
+    /**
+     * 创建新用户
+     * @param user 用户对象
+     * @return 保存后的用户对象
+     */
+    @Transactional
+    public User createUser(User user) {
+        // 加密密码
+        String encodedPassword = passwordEncoder.encode(user.getPassword());
+        System.out.println("创建用户: " + user.getUsername());
+        System.out.println("原始密码长度: " + user.getPassword().length());
+        System.out.println("加密密码长度: " + encodedPassword.length());
+        
+        user.setPassword(encodedPassword);
+        
+        // 设置默认角色
+        if (user.getRole() == null || user.getRole().isEmpty()) {
+            user.setRole("USER");
+        }
+        
+        return userRepository.save(user);
+    }
+} 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\resources\static\js\App.vue
+===========================================================================
+<template>
+  <div class="app-container">
+    <!-- 未登录时显示登录页面 -->
+    <login-page
+      v-if="!isLoggedIn"
+      @login-success="handleLoginSuccess"
+    />
+    
+    <!-- 登录后显示主页面 -->
+    <el-container v-else class="main-container">
+      <!-- 顶部导航栏 -->
+      <el-header class="app-header">
+        <div class="header-title">医院药品管理系统</div>
+        <div class="user-info">
+          <span>{{ userInfo.username }}</span>
+          <el-dropdown trigger="click" @command="handleCommand">
+            <el-avatar :size="32" :icon="UserFilled" />
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="profile">个人信息</el-dropdown-item>
+                <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </el-header>
+      
+      <!-- 内容区域 -->
+      <el-container>
+        <!-- 侧边菜单 -->
+        <el-aside width="200px" class="app-aside">
+          <el-menu
+            :default-active="activeMenu"
+            router
+            class="el-menu-vertical"
+          >
+            <el-menu-item index="drug-management" @click="activeMenu = 'drug-management'">
+              <el-icon><Box /></el-icon>
+              <span>药品管理</span>
+            </el-menu-item>
+            <el-menu-item index="user-management" @click="activeMenu = 'user-management'">
+              <el-icon><User /></el-icon>
+              <span>用户管理</span>
+            </el-menu-item>
+          </el-menu>
+        </el-aside>
+        
+        <!-- 主内容区 -->
+        <el-main class="app-main">
+          <!-- 药品管理页面 -->
+          <keep-alive>
+            <drug-management v-if="activeMenu === 'drug-management'" />
+            <div v-else-if="activeMenu === 'user-management'">
+              <h3>用户管理功能尚未实现</h3>
+            </div>
+          </keep-alive>
+        </el-main>
+      </el-container>
+    </el-container>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessageBox } from 'element-plus'
+import { UserFilled, User, Box } from '@element-plus/icons-vue'
+import LoginPage from './LoginPage.vue'
+import DrugManagement from './DrugManagement.vue'
+
+// 登录状态
+const isLoggedIn = ref(false)
+const userInfo = reactive({
+  id: null,
+  username: '',
+  role: ''
+})
+
+// 当前激活的菜单
+const activeMenu = ref('drug-management')
+
+// 页面加载时检查用户是否已登录
+onMounted(() => {
+  checkLoginStatus()
+})
+
+// 检查登录状态
+const checkLoginStatus = () => {
+  const userStr = localStorage.getItem('user')
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr)
+      userInfo.id = user.id
+      userInfo.username = user.username
+      userInfo.role = user.role
+      isLoggedIn.value = true
+    } catch (e) {
+      console.error('解析用户数据失败', e)
+      localStorage.removeItem('user')
+    }
+  }
+}
+
+// 登录成功处理
+const handleLoginSuccess = (user) => {
+  userInfo.id = user.id
+  userInfo.username = user.username
+  userInfo.role = user.role
+  isLoggedIn.value = true
+}
+
+// 下拉菜单命令处理
+const handleCommand = (command) => {
+  if (command === 'logout') {
+    ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }).then(() => {
+      // 清除本地存储
+      localStorage.removeItem('user')
+      // 重置状态
+      isLoggedIn.value = false
+      userInfo.id = null
+      userInfo.username = ''
+      userInfo.role = ''
+    }).catch(() => {})
+  } else if (command === 'profile') {
+    ElMessageBox.alert(`用户ID: ${userInfo.id}<br>用户名: ${userInfo.username}<br>角色: ${userInfo.role}`, '用户信息', {
+      dangerouslyUseHTMLString: true,
+      confirmButtonText: '确定'
+    })
+  }
+}
+</script>
+
+<style scoped>
+.app-container {
+  height: 100vh;
+  width: 100%;
+}
+
+.main-container {
+  height: 100%;
+}
+
+.app-header {
+  background-color: #409EFF;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  position: relative;
+  z-index: 10;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-aside {
+  background-color: #fff;
+  border-right: 1px solid #e6e6e6;
+}
+
+.el-menu-vertical {
+  height: 100%;
+  border-right: none;
+}
+
+.app-main {
+  background-color: #f5f7fa;
+  padding: 20px;
+}
+</style> 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\resources\static\js\DrugManagement.vue
+===========================================================================
+<template>
+  <div class="drug-management">
+    <h1 class="page-title">药品管理系统</h1>
+    
+    <!-- 搜索和操作区域 -->
+    <div class="operation-area">
+      <el-input
+        v-model="searchKeyword"
+        placeholder="请输入药品名称搜索"
+        class="search-input"
+        clearable
+        @clear="fetchDrugs"
+      >
+        <template #append>
+          <el-button @click="searchDrugs">
+            <el-icon><Search /></el-icon>
+          </el-button>
+        </template>
+      </el-input>
+      
+      <div class="action-buttons">
+        <el-button type="primary" @click="openAddDialog">
+          <el-icon><Plus /></el-icon> 新增药品
+        </el-button>
+        <el-button type="danger" @click="batchDelete" :disabled="selectedDrugs.length === 0">
+          <el-icon><Delete /></el-icon> 批量删除
+        </el-button>
+      </div>
+    </div>
+    
+    <!-- 药品表格 -->
+    <el-table
+      v-loading="loading"
+      :data="drugs"
+      border
+      style="width: 100%"
+      @selection-change="handleSelectionChange"
+    >
+      <el-table-column type="selection" width="55" />
+      <el-table-column prop="id" label="ID" width="80" />
+      <el-table-column prop="name" label="药品名称" min-width="150" />
+      <el-table-column prop="spec" label="规格" min-width="120" />
+      <el-table-column prop="category" label="药品类别" min-width="120" />
+      <el-table-column prop="stock" label="库存" width="100" />
+      <el-table-column prop="expirationDate" label="过期日期" min-width="120">
+        <template #default="scope">
+          {{ formatDate(scope.row.expirationDate) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="supplier" label="供应商" min-width="180" />
+      <el-table-column label="操作" width="200" fixed="right">
+        <template #default="scope">
+          <el-button type="primary" size="small" @click="editDrug(scope.row)">
+            编辑
+          </el-button>
+          <el-button type="danger" size="small" @click="deleteDrug(scope.row.id)">
+            删除
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    
+    <!-- 分页组件 -->
+    <div class="pagination-container">
+      <el-pagination
+        v-model:current-page="currentPage"
+        :page-size="pageSize"
+        layout="total, prev, pager, next, jumper"
+        :total="total"
+        @current-change="handleCurrentChange"
+      />
+    </div>
+    
+    <!-- 新增/编辑药品对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '编辑药品' : '新增药品'"
+      width="500px"
+    >
+      <el-form :model="drugForm" label-width="100px" :rules="rules" ref="drugFormRef">
+        <el-form-item label="药品名称" prop="name">
+          <el-input v-model="drugForm.name" placeholder="请输入药品名称" />
+        </el-form-item>
+        <el-form-item label="规格" prop="spec">
+          <el-input v-model="drugForm.spec" placeholder="请输入药品规格" />
+        </el-form-item>
+        <el-form-item label="药品类别" prop="category">
+          <el-input v-model="drugForm.category" placeholder="请输入药品类别" />
+        </el-form-item>
+        <el-form-item label="库存" prop="stock">
+          <el-input-number v-model="drugForm.stock" :min="0" />
+        </el-form-item>
+        <el-form-item label="过期日期" prop="expirationDate">
+          <el-date-picker
+            v-model="drugForm.expirationDate"
+            type="date"
+            placeholder="选择过期日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+          />
+        </el-form-item>
+        <el-form-item label="供应商" prop="supplier">
+          <el-input v-model="drugForm.supplier" placeholder="请输入供应商" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitForm">确认</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Delete, Plus, Search } from '@element-plus/icons-vue'
+import axios from 'axios'
+
+// 数据列表
+const drugs = ref([])
+const loading = ref(false)
+const searchKeyword = ref('')
+const selectedDrugs = ref([])
+const currentPage = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
+
+// 弹窗相关
+const dialogVisible = ref(false)
+const isEdit = ref(false)
+const drugFormRef = ref(null)
+const drugForm = reactive({
+  id: null,
+  name: '',
+  spec: '',
+  category: '',
+  stock: 0,
+  expirationDate: '',
+  supplier: ''
+})
+
+// 表单验证规则
+const rules = {
+  name: [
+    { required: true, message: '请输入药品名称', trigger: 'blur' },
+    { min: 1, max: 50, message: '长度在 1 到 50 个字符', trigger: 'blur' }
+  ],
+  spec: [
+    { required: true, message: '请输入药品规格', trigger: 'blur' }
+  ],
+  category: [
+    { required: true, message: '请输入药品类别', trigger: 'blur' }
+  ],
+  stock: [
+    { required: true, message: '请输入库存数量', trigger: 'blur' }
+  ],
+  expirationDate: [
+    { required: true, message: '请选择过期日期', trigger: 'change' }
+  ],
+  supplier: [
+    { required: true, message: '请输入供应商', trigger: 'blur' }
+  ]
+}
+
+// 初始化获取数据
+onMounted(() => {
+  fetchDrugs()
+})
+
+// 获取药品列表
+const fetchDrugs = async () => {
+  loading.value = true
+  try {
+    const response = await axios.get('/api/drugs')
+    drugs.value = response.data
+    total.value = response.data.length
+    loading.value = false
+  } catch (error) {
+    console.error('获取药品列表失败:', error)
+    ElMessage.error('获取药品列表失败')
+    loading.value = false
+  }
+}
+
+// 搜索药品
+const searchDrugs = async () => {
+  if (searchKeyword.value.trim() === '') {
+    fetchDrugs()
+    return
+  }
+  
+  loading.value = true
+  try {
+    const response = await axios.get(`/api/drugs/search?name=${encodeURIComponent(searchKeyword.value.trim())}`)
+    if (response.data && response.data.drugs) {
+      drugs.value = response.data.drugs
+      total.value = response.data.drugs.length
+    } else {
+      drugs.value = []
+      total.value = 0
+    }
+  } catch (error) {
+    console.error('搜索药品失败:', error)
+    ElMessage.error('搜索药品失败')
+    drugs.value = []
+    total.value = 0
+  } finally {
+    loading.value = false
+  }
+}
+
+// 多选变化
+const handleSelectionChange = (selection) => {
+  selectedDrugs.value = selection
+}
+
+// 分页
+const handleCurrentChange = (page) => {
+  currentPage.value = page
+  fetchDrugs()
+}
+
+// 日期格式化
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  
+  const date = new Date(dateString)
+  return date.toLocaleDateString()
+}
+
+// 打开新增药品对话框
+const openAddDialog = () => {
+  isEdit.value = false
+  resetForm()
+  dialogVisible.value = true
+}
+
+// 编辑药品
+const editDrug = (row) => {
+  isEdit.value = true
+  Object.keys(drugForm).forEach(key => {
+    drugForm[key] = row[key]
+  })
+  dialogVisible.value = true
+}
+
+// 删除单个药品
+const deleteDrug = (id) => {
+  ElMessageBox.confirm('确定要删除该药品吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(async () => {
+    try {
+      await axios.delete(`/api/drugs/${id}`)
+      ElMessage.success('删除成功')
+      fetchDrugs()
+    } catch (error) {
+      console.error('删除药品失败:', error)
+      ElMessage.error('删除药品失败')
+    }
+  }).catch(() => {})
+}
+
+// 批量删除药品
+const batchDelete = () => {
+  if (selectedDrugs.value.length === 0) {
+    ElMessage.warning('请选择要删除的药品')
+    return
+  }
+  
+  ElMessageBox.confirm(`确定要删除选中的 ${selectedDrugs.value.length} 个药品吗？`, '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(async () => {
+    try {
+      const ids = selectedDrugs.value.map(drug => drug.id)
+      await axios.delete('/api/drugs/batch', { data: ids })
+      ElMessage.success('批量删除成功')
+      fetchDrugs()
+    } catch (error) {
+      console.error('批量删除药品失败:', error)
+      ElMessage.error('批量删除药品失败')
+    }
+  }).catch(() => {})
+}
+
+// 重置表单
+const resetForm = () => {
+  if (drugFormRef.value) {
+    drugFormRef.value.resetFields()
+  }
+  
+  drugForm.id = null
+  drugForm.name = ''
+  drugForm.spec = ''
+  drugForm.category = ''
+  drugForm.stock = 0
+  drugForm.expirationDate = ''
+  drugForm.supplier = ''
+}
+
+// 提交表单
+const submitForm = async () => {
+  if (!drugFormRef.value) return
+  
+  drugFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        if (isEdit.value) {
+          // 编辑药品
+          await axios.put(`/api/drugs/${drugForm.id}`, drugForm)
+          ElMessage.success('编辑成功')
+        } else {
+          // 新增药品
+          await axios.post('/api/drugs', drugForm)
+          ElMessage.success('添加成功')
+        }
+        dialogVisible.value = false
+        fetchDrugs()
+      } catch (error) {
+        console.error(isEdit.value ? '编辑药品失败:' : '添加药品失败:', error)
+        ElMessage.error(isEdit.value ? '编辑药品失败' : '添加药品失败')
+      }
+    }
+  })
+}
+</script>
+
+<style scoped>
+.drug-management {
+  padding: 20px;
+}
+
+.page-title {
+  margin-bottom: 20px;
+  color: #303133;
+}
+
+.operation-area {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.search-input {
+  width: 300px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+</style> 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\resources\static\js\LoginPage.vue
+===========================================================================
+<template>
+  <div class="login-container">
+    <el-card class="login-card">
+      <div class="login-header">
+        <h2>医院药品管理系统</h2>
+      </div>
+      
+      <el-form ref="loginFormRef" :model="loginForm" :rules="rules" label-width="0">
+        <el-form-item prop="username">
+          <el-input 
+            v-model="loginForm.username" 
+            placeholder="用户名" 
+            prefix-icon="User"
+            clearable
+          />
+        </el-form-item>
+        
+        <el-form-item prop="password">
+          <el-input 
+            v-model="loginForm.password" 
+            type="password" 
+            placeholder="密码" 
+            prefix-icon="Lock"
+            show-password
+            clearable
+            @keyup.enter="handleLogin"
+          />
+        </el-form-item>
+        
+        <el-form-item>
+          <el-button 
+            type="primary" 
+            class="login-button" 
+            :loading="loading" 
+            @click="handleLogin"
+          >
+            登录
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive } from 'vue'
+import { ElMessage } from 'element-plus'
+import { User, Lock } from '@element-plus/icons-vue'
+import axios from 'axios'
+
+const emit = defineEmits(['login-success'])
+
+// 登录表单
+const loginFormRef = ref(null)
+const loginForm = reactive({
+  username: '',
+  password: ''
+})
+
+// 表单验证规则
+const rules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' }
+  ]
+}
+
+// 登录状态
+const loading = ref(false)
+
+// 登录处理
+const handleLogin = () => {
+  if (!loginFormRef.value) return
+  
+  loginFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    
+    loading.value = true
+    
+    try {
+      const response = await axios.post('/auth/login', loginForm)
+      
+      // 登录成功
+      if (response.data && response.data.status === 'success') {
+        // 存储用户信息到本地存储
+        localStorage.setItem('user', JSON.stringify(response.data.user))
+        
+        ElMessage.success('登录成功')
+        
+        // 通知父组件登录成功
+        emit('login-success', response.data.user)
+      } else {
+        ElMessage.error(response.data?.message || '登录失败')
+      }
+    } catch (error) {
+      console.error('登录失败:', error)
+      ElMessage.error(error.response?.data?.message || '登录失败，请检查用户名和密码')
+    } finally {
+      loading.value = false
+    }
+  })
+}
+</script>
+
+<style scoped>
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #f0f2f5;
+}
+
+.login-card {
+  width: 380px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.login-header h2 {
+  color: #409EFF;
+  font-weight: 600;
+}
+
+.login-button {
+  width: 100%;
+}
+</style> 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\resources\static\js\main.js
+===========================================================================
+import { createApp } from 'vue'
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import axios from 'axios'
+import App from './App.vue'
+
+// 引入全局样式
+import '../css/global.css'
+
+// 配置axios
+axios.defaults.baseURL = window.location.origin
+axios.defaults.headers.common['Content-Type'] = 'application/json'
+
+// 添加请求拦截器，设置用户信息到请求头
+axios.interceptors.request.use(config => {
+  // 从localStorage获取用户信息
+  const userStr = localStorage.getItem('user')
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr)
+      // 将用户名添加到请求头
+      config.headers['X-Username'] = user.username
+    } catch (e) {
+      console.error('解析用户数据失败', e)
+    }
+  }
+  return config
+})
+
+// 创建应用实例
+const app = createApp(App)
+
+// 注册Element Plus
+app.use(ElementPlus, {
+  locale: zhCn
+})
+
+// 注册所有图标
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+  app.component(key, component)
+}
+
+// 挂载应用
+app.mount('#app') 
+
+
+===========================================================================
+鏂囦欢璺緞: .\src\main\resources\application.properties
+===========================================================================
+# 数据源配置
+spring.datasource.url=jdbc:h2:mem:hospitaldb
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=password
+
+# JPA配置
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+
+# H2 控制台配置
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+
+# 服务器配置
+server.port=8082
+
+# 日志配置
+logging.level.org.springframework.web=INFO
+logging.level.org.hibernate=ERROR
+logging.level.com.example.hospital=DEBUG
+
+# 静态资源配置
+spring.web.resources.static-locations=classpath:/static/dist/
+spring.mvc.static-path-pattern=/**
+spring.web.resources.chain.strategy.content.enabled=true
+spring.web.resources.chain.strategy.content.paths=/**
+
+# 开发环境配置
+spring.devtools.restart.enabled=true
+spring.devtools.livereload.enabled=true
+
+# 允许循环依赖（作为最后的解决方案）
+spring.main.allow-circular-references=true 
+
+
+===========================================================================
+鏂囦欢璺緞: .\src\main\resources\static\vite.config.js
+===========================================================================
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import { fileURLToPath, URL } from 'node:url'
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  base: './',
+  plugins: [vue()],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./js', import.meta.url))
+    }
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8082',
+        changeOrigin: true
+      },
+      '/auth': {
+        target: 'http://localhost:8082',
+        changeOrigin: true
+      }
+    }
+  },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    emptyOutDir: true
+  }
+}) 
+
+
+===========================================================================
+鏂囦欢璺緞: .\pom.xml
+===========================================================================
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>hospital-drug-system</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>hospital-drug-system</name>
+    <description>Spring Boot Project for Hospital Drug System</description>
+    <packaging>jar</packaging>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.7.5</version>
+        <relativePath/>
+    </parent>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <hibernate.version>5.6.12.Final</hibernate.version>
+    </properties>
+
+    <dependencies>
+        <!-- Spring Web -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- JPA 数据访问 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        
+        <!-- 显式声明Hibernate依赖 -->
+        <dependency>
+            <groupId>org.hibernate</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <version>${hibernate.version}</version>
+        </dependency>
+
+        <!-- javax.persistence API -->
+        <dependency>
+            <groupId>javax.persistence</groupId>
+            <artifactId>javax.persistence-api</artifactId>
+            <version>2.2</version>
+        </dependency>
+
+        <!-- H2 内存数据库 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Spring Security -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
+        <!-- Lombok（可选） -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        
+        <!-- Spring Boot 测试依赖 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.junit.vintage</groupId>
+                    <artifactId>junit-vintage-engine</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        
+        <!-- JUnit Jupiter API -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.8.2</version>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- JUnit Jupiter Engine -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.8.2</version>
+            <scope>test</scope>
+        </dependency>
+        
+        <!-- Spring Security 测试依赖 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Maven 插件 -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.22.2</version>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\resources\static\index.html
+===========================================================================
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>医院药品管理系统</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    }
+    #app {
+      height: 100%;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html> 
+
+
+===========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\resources\static\css\global.css
+===========================================================================
+/* 全局样式 */
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  width: 100%;
+  background-color: #f5f7fa;
+}
+
+/* 去除默认边距 */
+* {
+  box-sizing: border-box;
+}
+
+/* 根容器 */
+#app {
+  height: 100%;
+  width: 100%;
+}
+
+/* 超链接样式 */
+a {
+  text-decoration: none;
+  color: #409EFF;
+}
+
+a:hover {
+  color: #66b1ff;
+}
+
+/* 表格基础样式 */
+.el-table .cell {
+  word-break: break-word;
+}
+
+/* 表单样式 */
+.el-form-item__error {
+  font-size: 12px;
+}
+
+/* 通用边距 */
+.mt-10 {
+  margin-top: 10px;
+}
+
+.mb-10 {
+  margin-bottom: 10px;
+}
+
+.ml-10 {
+  margin-left: 10px;
+}
+
+.mr-10 {
+  margin-right: 10px;
+}
+
+.pt-20 {
+  padding-top: 20px;
+}
+
+.pb-20 {
+  padding-bottom: 20px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .el-form-item__label {
+    float: none;
+    display: block;
+    text-align: left;
+    padding: 0 0 10px;
+  }
+  
+  .el-form-item__content {
+    margin-left: 0 !important;
+  }
+} 

@@ -1,0 +1,85 @@
+﻿==========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\resources\static\css\global.css
+==========================================================================
+
+/* 全局样式 */
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  width: 100%;
+  background-color: #f5f7fa;
+}
+
+/* 去除默认边距 */
+* {
+  box-sizing: border-box;
+}
+
+/* 根容器 */
+#app {
+  height: 100%;
+  width: 100%;
+}
+
+/* 超链接样式 */
+a {
+  text-decoration: none;
+  color: #409EFF;
+}
+
+a:hover {
+  color: #66b1ff;
+}
+
+/* 表格基础样式 */
+.el-table .cell {
+  word-break: break-word;
+}
+
+/* 表单样式 */
+.el-form-item__error {
+  font-size: 12px;
+}
+
+/* 通用边距 */
+.mt-10 {
+  margin-top: 10px;
+}
+
+.mb-10 {
+  margin-bottom: 10px;
+}
+
+.ml-10 {
+  margin-left: 10px;
+}
+
+.mr-10 {
+  margin-right: 10px;
+}
+
+.pt-20 {
+  padding-top: 20px;
+}
+
+.pb-20 {
+  padding-bottom: 20px;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .el-form-item__label {
+    float: none;
+    display: block;
+    text-align: left;
+    padding: 0 0 10px;
+  }
+  
+  .el-form-item__content {
+    margin-left: 0 !important;
+  }
+} 

@@ -1,0 +1,63 @@
+﻿==========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\config\DataInitializer.java
+==========================================================================
+
+package com.example.hospital.config;
+
+import com.example.hospital.model.User;
+import com.example.hospital.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DataInitializer implements CommandLineRunner {
+
+    @Autowired
+    private UserService userService;
+    
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Override
+    public void run(String... args) throws Exception {
+        // 检查是否已有管理员用户
+        User existingAdmin = userService.findByUsername("admin");
+        if (existingAdmin == null) {
+            // 创建默认管理员用户
+            User adminUser = new User();
+            adminUser.setUsername("admin");
+            String rawPassword = "admin123";
+            adminUser.setPassword(rawPassword);
+            adminUser.setRole("ADMIN");
+            User savedAdmin = userService.createUser(adminUser);
+            
+            // 测试密码是否匹配
+            boolean passwordMatches = passwordEncoder.matches(rawPassword, savedAdmin.getPassword());
+            
+            System.out.println("已创建默认管理员用户: admin/admin123");
+            System.out.println("加密后密码: " + savedAdmin.getPassword());
+            System.out.println("密码匹配测试: " + passwordMatches);
+        } else {
+            System.out.println("已存在管理员用户: " + existingAdmin.getUsername());
+            // 尝试使用已知密码进行匹配测试
+            boolean passwordMatches = passwordEncoder.matches("admin123", existingAdmin.getPassword());
+            System.out.println("密码匹配测试: " + passwordMatches);
+        }
+        
+        // 检查是否已有普通用户
+        if (userService.findByUsername("user") == null) {
+            // 创建默认普通用户
+            User normalUser = new User();
+            normalUser.setUsername("user");
+            String rawPassword = "user123";
+            normalUser.setPassword(rawPassword);
+            normalUser.setRole("USER");
+            User savedUser = userService.createUser(normalUser);
+            
+            System.out.println("已创建默认普通用户: user/user123");
+            System.out.println("加密后密码: " + savedUser.getPassword());
+        }
+    }
+} 

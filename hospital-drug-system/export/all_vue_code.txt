@@ -1,0 +1,2127 @@
+﻿==== src\main\resources\static\js\App.vue ====
+<template>
+  <div class="app-container">
+    <!-- 鏈櫥褰曟椂鏄剧ず鐧诲綍椤甸潰 -->
+    <login-page
+      v-if="!isLoggedIn"
+      @login-success="handleLoginSuccess"
+    />
+    
+    <!-- 鐧诲綍鍚庢樉绀轰富椤甸潰 -->
+    <el-container v-else class="main-container">
+      <!-- 椤堕儴瀵艰埅鏍?-->
+      <el-header class="app-header">
+        <div class="header-title">鍖婚櫌鑽搧绠＄悊绯荤粺</div>
+        <div class="user-info">
+          <span>{{ userInfo.username }}</span>
+          <el-dropdown trigger="click" @command="handleCommand">
+            <el-avatar :size="32" :icon="UserFilled" />
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="profile">涓汉淇℃伅</el-dropdown-item>
+                <el-dropdown-item command="logout" divided>閫€鍑虹櫥褰?/el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </el-header>
+      
+      <!-- 鍐呭鍖哄煙 -->
+      <el-container>
+        <!-- 渚ц竟鑿滃崟 -->
+        <el-aside width="200px" class="app-aside">
+          <el-menu
+            :default-active="activeMenu"
+            router
+            class="el-menu-vertical"
+          >
+            <el-menu-item index="drug-management" @click="activeMenu = 'drug-management'">
+              <el-icon><Box /></el-icon>
+              <span>鑽搧绠＄悊</span>
+            </el-menu-item>
+            <el-menu-item index="drug-statistics" @click="activeMenu = 'drug-statistics'">
+              <el-icon><DataAnalysis /></el-icon>
+              <span>鑽搧缁熻</span>
+            </el-menu-item>
+            <el-menu-item index="drug-chart" @click="activeMenu = 'drug-chart'">
+              <el-icon><TrendCharts /></el-icon>
+              <span>搴撳瓨璧板娍</span>
+            </el-menu-item>
+            <el-menu-item index="operation-log" @click="activeMenu = 'operation-log'">
+              <el-icon><Document /></el-icon>
+              <span>鎿嶄綔鏃ュ織</span>
+            </el-menu-item>
+            <el-menu-item index="user-management" @click="activeMenu = 'user-management'" v-if="userInfo.role === 'ADMIN'">
+              <el-icon><User /></el-icon>
+              <span>鐢ㄦ埛绠＄悊</span>
+            </el-menu-item>
+            <el-menu-item index="system-settings" @click="activeMenu = 'system-settings'" v-if="userInfo.role === 'ADMIN'">
+              <el-icon><Setting /></el-icon>
+              <span>绯荤粺璁剧疆</span>
+            </el-menu-item>
+          </el-menu>
+        </el-aside>
+        
+        <!-- 涓诲唴瀹瑰尯 -->
+        <el-main class="app-main">
+          <!-- 涓嶅悓椤甸潰缁勪欢 -->
+          <keep-alive>
+            <drug-management v-if="activeMenu === 'drug-management'" />
+            <user-management v-else-if="activeMenu === 'user-management'" />
+            <drug-statistics v-else-if="activeMenu === 'drug-statistics'" />
+            <drug-chart v-else-if="activeMenu === 'drug-chart'" />
+            <operation-log v-else-if="activeMenu === 'operation-log'" />
+            <system-settings v-else-if="activeMenu === 'system-settings'" />
+          </keep-alive>
+        </el-main>
+      </el-container>
+    </el-container>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessageBox, ElMessage } from 'element-plus'
+import { UserFilled, User, Box, DataAnalysis, TrendCharts, Document, Setting } from '@element-plus/icons-vue'
+import LoginPage from './LoginPage.vue'
+import DrugManagement from './DrugManagement.vue'
+import UserManagement from './UserManagement.vue'
+import DrugStatistics from './DrugStatistics.vue'
+import DrugChart from './DrugChart.vue'
+import OperationLog from './OperationLog.vue'
+import SystemSettings from './SystemSettings.vue'
+import axios from 'axios'
+
+// 鐧诲綍鐘舵€?
+const isLoggedIn = ref(false)
+const userInfo = reactive({
+  id: null,
+  username: '',
+  role: ''
+})
+
+// 褰撳墠婵€娲荤殑鑿滃崟
+const activeMenu = ref('drug-management')
+
+// 椤甸潰鍔犺浇鏃舵鏌ョ敤鎴锋槸鍚﹀凡鐧诲綍
+onMounted(() => {
+  checkLoginStatus()
+})
+
+// 妫€鏌ョ櫥褰曠姸鎬?
+const checkLoginStatus = async () => {
+  const userStr = localStorage.getItem('user')
+  const token = localStorage.getItem('token')
+  
+  // 鍙湁褰撶敤鎴蜂俊鎭拰浠ょ墝閮藉瓨鍦ㄦ椂鎵嶈涓虹櫥褰曟湁鏁?
+  if (userStr && token) {
+    try {
+      const user = JSON.parse(userStr)
+      userInfo.id = user.id
+      userInfo.username = user.username
+      userInfo.role = user.role
+      
+      // 灏濊瘯楠岃瘉浠ょ墝鏈夋晥鎬?
+      try {
+        await axios.get('/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        isLoggedIn.value = true
+      } catch (error) {
+        console.error('浠ょ墝楠岃瘉澶辫触:', error)
+        // 娓呴櫎鏃犳晥鐨勫瓨鍌ㄦ暟鎹?
+        localStorage.removeItem('user')
+        localStorage.removeItem('token')
+        ElMessage.error('鐧诲綍宸茶繃鏈燂紝璇烽噸鏂扮櫥褰?)
+      }
+    } catch (e) {
+      console.error('瑙ｆ瀽鐢ㄦ埛鏁版嵁澶辫触', e)
+      // 娓呴櫎鏃犳晥鐨勫瓨鍌ㄦ暟鎹?
+      localStorage.removeItem('user')
+      localStorage.removeItem('token')
+    }
+  } else {
+    // 濡傛灉鐢ㄦ埛淇℃伅鍜屼护鐗屼笉鍚屾椂瀛樺湪锛屾竻闄ゆ墍鏈夊瓨鍌ㄦ暟鎹?
+    localStorage.removeItem('user')
+    localStorage.removeItem('token')
+  }
+}
+
+// 鐧诲綍鎴愬姛澶勭悊
+const handleLoginSuccess = (user) => {
+  userInfo.id = user.id
+  userInfo.username = user.username
+  userInfo.role = user.role
+  isLoggedIn.value = true
+}
+
+// 涓嬫媺鑿滃崟鍛戒护澶勭悊
+const handleCommand = (command) => {
+  if (command === 'logout') {
+    ElMessageBox.confirm('纭畾瑕侀€€鍑虹櫥褰曞悧锛?, '鎻愮ず', {
+      confirmButtonText: '纭畾',
+      cancelButtonText: '鍙栨秷',
+      type: 'warning'
+    }).then(() => {
+      // 娓呴櫎鏈湴瀛樺偍
+      localStorage.removeItem('user')
+      localStorage.removeItem('token')
+      // 閲嶇疆鐘舵€?
+      isLoggedIn.value = false
+      userInfo.id = null
+      userInfo.username = ''
+      userInfo.role = ''
+      ElMessage.success('宸查€€鍑虹櫥褰?)
+    }).catch(() => {})
+  } else if (command === 'profile') {
+    ElMessageBox.alert(`鐢ㄦ埛ID: ${userInfo.id}<br>鐢ㄦ埛鍚? ${userInfo.username}<br>瑙掕壊: ${userInfo.role}`, '鐢ㄦ埛淇℃伅', {
+      dangerouslyUseHTMLString: true,
+      confirmButtonText: '纭畾'
+    })
+  }
+}
+</script>
+
+<style scoped>
+.app-container {
+  height: 100vh;
+  width: 100%;
+}
+
+.main-container {
+  height: 100%;
+}
+
+.app-header {
+  background-color: #409EFF;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  position: relative;
+  z-index: 10;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-aside {
+  background-color: #fff;
+  border-right: 1px solid #e6e6e6;
+}
+
+.el-menu-vertical {
+  height: 100%;
+  border-right: none;
+}
+
+.app-main {
+  background-color: #f5f7fa;
+  padding: 20px;
+}
+</style> 
+
+==== src\main\resources\static\js\DrugChart.vue ====
+<template>
+  <div class="chart-container">
+    <h1 class="page-title">搴撳瓨璧板娍鍥?/h1>
+    
+    <el-card class="chart-card">
+      <div id="stock-chart" ref="stockChart" class="chart"></div>
+    </el-card>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import axios from 'axios'
+import * as echarts from 'echarts/core'
+import { LineChart } from 'echarts/charts'
+import {
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
+  ToolboxComponent,
+  DataZoomComponent
+} from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+
+// 娉ㄥ唽 ECharts 蹇呴渶鐨勭粍浠?
+echarts.use([
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
+  ToolboxComponent,
+  DataZoomComponent,
+  LineChart,
+  CanvasRenderer
+])
+
+const stockChart = ref(null)
+let chart = null
+
+onMounted(() => {
+  // 鍒濆鍖栧浘琛?
+  initChart()
+  
+  // 鍔犺浇鏁版嵁
+  fetchStockHistoryData()
+  
+  // 鍝嶅簲寮忚皟鏁村浘琛ㄥぇ灏?
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  // 绉婚櫎浜嬩欢鐩戝惉
+  window.removeEventListener('resize', handleResize)
+  
+  // 閿€姣佸浘琛?
+  if (chart) {
+    chart.dispose()
+    chart = null
+  }
+})
+
+// 澶勭悊绐楀彛澶у皬鍙樺寲
+const handleResize = () => {
+  if (chart) {
+    chart.resize()
+  }
+}
+
+// 鍒濆鍖栧浘琛?
+const initChart = () => {
+  if (stockChart.value) {
+    chart = echarts.init(stockChart.value)
+    
+    // 璁剧疆鍒濆鍔犺浇鐘舵€?
+    chart.showLoading()
+  }
+}
+
+// 鑾峰彇搴撳瓨鍘嗗彶鏁版嵁
+const fetchStockHistoryData = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const response = await axios.get('/api/statistics/stock-history?days=30', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    // 鏇存柊鍥捐〃
+    renderChart(response.data)
+  } catch (error) {
+    console.error('鑾峰彇搴撳瓨鍘嗗彶鏁版嵁澶辫触:', error)
+    ElMessage.error('鑾峰彇搴撳瓨鍘嗗彶鏁版嵁澶辫触')
+  }
+}
+
+// 娓叉煋鍥捐〃
+const renderChart = (data) => {
+  if (!chart) return
+  
+  // 闅愯棌鍔犺浇鐘舵€?
+  chart.hideLoading()
+  
+  // 濡傛灉娌℃湁鏁版嵁
+  if (!data || data.length === 0) {
+    chart.setOption({
+      title: {
+        text: '鏆傛棤搴撳瓨鍘嗗彶鏁版嵁',
+        left: 'center',
+        top: 'center',
+        textStyle: {
+          fontSize: 16,
+          color: '#999'
+        }
+      }
+    })
+    return
+  }
+  
+  // 鍑嗗鍥捐〃鏁版嵁
+  const dates = data.map(item => item.date)
+  const stockValues = data.map(item => item.totalStock)
+  
+  // 璁剧疆鍥捐〃閰嶇疆
+  const option = {
+    title: {
+      text: '30澶╄嵂鍝佸簱瀛樿蛋鍔?,
+      left: 'center'
+    },
+    tooltip: {
+      trigger: 'axis',
+      formatter: '{b}<br />搴撳瓨鎬婚噺: {c}'
+    },
+    toolbox: {
+      feature: {
+        saveAsImage: {}
+      }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '10%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: dates,
+      axisLabel: {
+        rotate: 30
+      }
+    },
+    yAxis: {
+      type: 'value',
+      name: '搴撳瓨鎬婚噺'
+    },
+    dataZoom: [
+      {
+        type: 'inside',
+        start: 0,
+        end: 100
+      },
+      {
+        type: 'slider',
+        start: 0,
+        end: 100
+      }
+    ],
+    series: [
+      {
+        name: '搴撳瓨鎬婚噺',
+        type: 'line',
+        data: stockValues,
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        itemStyle: {
+          color: '#409EFF'
+        },
+        lineStyle: {
+          width: 3
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            {
+              offset: 0,
+              color: 'rgba(64, 158, 255, 0.5)'
+            },
+            {
+              offset: 1,
+              color: 'rgba(64, 158, 255, 0.1)'
+            }
+          ])
+        },
+        markPoint: {
+          data: [
+            { type: 'max', name: '鏈€澶у€? },
+            { type: 'min', name: '鏈€灏忓€? }
+          ]
+        }
+      }
+    ]
+  }
+  
+  // 搴旂敤閰嶇疆
+  chart.setOption(option)
+}
+</script>
+
+<style scoped>
+.chart-container {
+  padding: 20px;
+}
+
+.page-title {
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: bold;
+  color: #409EFF;
+}
+
+.chart-card {
+  margin-bottom: 20px;
+}
+
+.chart {
+  height: 500px;
+  width: 100%;
+}
+</style> 
+
+==== src\main\resources\static\js\DrugManagement.vue ====
+<template>
+  <div class="drug-management">
+    <h1 class="page-title">鑽搧绠＄悊绯荤粺</h1>
+    
+    <!-- 杩囨湡棰勮鎻愮ず -->
+    <div v-if="expiringDrugs.length > 0" class="expiring-warning">
+      <el-alert
+        title="鑽搧杩囨湡棰勮"
+        type="error"
+        :closable="false"
+        show-icon
+      >
+        <div class="expiring-list">
+          <span>浠ヤ笅鑽搧鍗冲皢鍦?0澶╁唴杩囨湡锛岃鍙婃椂澶勭悊锛?/span>
+          <el-tag
+            v-for="drug in expiringDrugs"
+            :key="drug.id"
+            type="danger"
+            class="expiring-tag"
+          >
+            {{ drug.name }} ({{ formatDate(drug.expirationDate) }})
+          </el-tag>
+        </div>
+      </el-alert>
+    </div>
+    
+    <!-- 鎼滅储鍜屾搷浣滃尯鍩?-->
+    <div class="operation-area">
+      <el-input
+        v-model="searchKeyword"
+        placeholder="璇疯緭鍏ヨ嵂鍝佸悕绉版悳绱?
+        class="search-input"
+        clearable
+        @clear="fetchDrugs"
+      >
+        <template #append>
+          <el-button @click="searchDrugs">
+            <el-icon><Search /></el-icon>
+          </el-button>
+        </template>
+      </el-input>
+      
+      <div class="action-buttons">
+        <el-button type="primary" @click="openAddDialog">
+          <el-icon><Plus /></el-icon> 鏂板鑽搧
+        </el-button>
+        <el-button type="danger" @click="batchDelete" :disabled="selectedDrugs.length === 0">
+          <el-icon><Delete /></el-icon> 鎵归噺鍒犻櫎
+        </el-button>
+        <el-button type="success" @click="exportToCsv">
+          <el-icon><Download /></el-icon> 瀵煎嚭CSV
+        </el-button>
+      </div>
+    </div>
+    
+    <!-- 鑽搧琛ㄦ牸 -->
+    <el-table
+      v-loading="loading"
+      :data="drugs"
+      border
+      style="width: 100%"
+      @selection-change="handleSelectionChange"
+    >
+      <el-table-column type="selection" width="55" />
+      <el-table-column prop="id" label="ID" width="80" />
+      <el-table-column prop="name" label="鑽搧鍚嶇О" min-width="150" />
+      <el-table-column prop="spec" label="瑙勬牸" min-width="120" />
+      <el-table-column prop="category" label="鑽搧绫诲埆" min-width="120" />
+      <el-table-column prop="stock" label="搴撳瓨" width="100" />
+      <el-table-column prop="expirationDate" label="杩囨湡鏃ユ湡" min-width="120">
+        <template #default="scope">
+          {{ formatDate(scope.row.expirationDate) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="supplier" label="渚涘簲鍟? min-width="180" />
+      <el-table-column label="鎿嶄綔" width="200" fixed="right">
+        <template #default="scope">
+          <el-button type="primary" size="small" @click="editDrug(scope.row)">
+            缂栬緫
+          </el-button>
+          <el-button type="danger" size="small" @click="deleteDrug(scope.row.id)">
+            鍒犻櫎
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    
+    <!-- 鍒嗛〉缁勪欢 -->
+    <div class="pagination-container">
+      <el-pagination
+        v-model:current-page="currentPage"
+        :page-size="pageSize"
+        layout="total, prev, pager, next, jumper"
+        :total="total"
+        @current-change="handleCurrentChange"
+      />
+    </div>
+    
+    <!-- 鏂板/缂栬緫鑽搧瀵硅瘽妗?-->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '缂栬緫鑽搧' : '鏂板鑽搧'"
+      width="500px"
+    >
+      <el-form :model="drugForm" label-width="100px" :rules="rules" ref="drugFormRef">
+        <el-form-item label="鑽搧鍚嶇О" prop="name">
+          <el-input v-model="drugForm.name" placeholder="璇疯緭鍏ヨ嵂鍝佸悕绉? />
+        </el-form-item>
+        <el-form-item label="瑙勬牸" prop="spec">
+          <el-input v-model="drugForm.spec" placeholder="璇疯緭鍏ヨ嵂鍝佽鏍? />
+        </el-form-item>
+        <el-form-item label="鑽搧绫诲埆" prop="category">
+          <el-input v-model="drugForm.category" placeholder="璇疯緭鍏ヨ嵂鍝佺被鍒? />
+        </el-form-item>
+        <el-form-item label="搴撳瓨" prop="stock">
+          <el-input-number v-model="drugForm.stock" :min="0" />
+        </el-form-item>
+        <el-form-item label="杩囨湡鏃ユ湡" prop="expirationDate">
+          <el-date-picker
+            v-model="drugForm.expirationDate"
+            type="date"
+            placeholder="閫夋嫨杩囨湡鏃ユ湡"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+          />
+        </el-form-item>
+        <el-form-item label="渚涘簲鍟? prop="supplier">
+          <el-input v-model="drugForm.supplier" placeholder="璇疯緭鍏ヤ緵搴斿晢" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">鍙栨秷</el-button>
+        <el-button type="primary" @click="submitForm">纭</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Delete, Plus, Search, Download } from '@element-plus/icons-vue'
+import axios from 'axios'
+
+// 鏁版嵁鍒楄〃
+const drugs = ref([])
+const loading = ref(false)
+const searchKeyword = ref('')
+const selectedDrugs = ref([])
+const currentPage = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
+const expiringDrugs = ref([]) // 鍗冲皢杩囨湡鐨勮嵂鍝?
+
+// 寮圭獥鐩稿叧
+const dialogVisible = ref(false)
+const isEdit = ref(false)
+const drugFormRef = ref(null)
+const drugForm = reactive({
+  id: null,
+  name: '',
+  spec: '',
+  category: '',
+  stock: 0,
+  expirationDate: '',
+  supplier: ''
+})
+
+// 琛ㄥ崟楠岃瘉瑙勫垯
+const rules = {
+  name: [
+    { required: true, message: '璇疯緭鍏ヨ嵂鍝佸悕绉?, trigger: 'blur' },
+    { min: 1, max: 50, message: '闀垮害鍦?1 鍒?50 涓瓧绗?, trigger: 'blur' }
+  ],
+  spec: [
+    { required: true, message: '璇疯緭鍏ヨ嵂鍝佽鏍?, trigger: 'blur' }
+  ],
+  category: [
+    { required: true, message: '璇疯緭鍏ヨ嵂鍝佺被鍒?, trigger: 'blur' }
+  ],
+  stock: [
+    { required: true, message: '璇疯緭鍏ュ簱瀛樻暟閲?, trigger: 'blur' }
+  ],
+  expirationDate: [
+    { required: true, message: '璇烽€夋嫨杩囨湡鏃ユ湡', trigger: 'change' }
+  ],
+  supplier: [
+    { required: true, message: '璇疯緭鍏ヤ緵搴斿晢', trigger: 'blur' }
+  ]
+}
+
+// 鍒濆鍖栬幏鍙栨暟鎹?
+onMounted(() => {
+  fetchDrugs()
+  fetchExpiringDrugs()
+})
+
+// 鑾峰彇鑽搧鍒楄〃
+const fetchDrugs = async () => {
+  loading.value = true
+  try {
+    const response = await axios.get('/api/drugs')
+    drugs.value = response.data
+    total.value = response.data.length
+    loading.value = false
+  } catch (error) {
+    console.error('鑾峰彇鑽搧鍒楄〃澶辫触:', error)
+    ElMessage.error('鑾峰彇鑽搧鍒楄〃澶辫触')
+    loading.value = false
+  }
+}
+
+// 鎼滅储鑽搧
+const searchDrugs = async () => {
+  if (searchKeyword.value.trim() === '') {
+    fetchDrugs()
+    return
+  }
+  
+  loading.value = true
+  try {
+    const response = await axios.get(`/api/drugs/search?name=${encodeURIComponent(searchKeyword.value.trim())}`)
+    if (response.data && response.data.drugs) {
+      drugs.value = response.data.drugs
+      total.value = response.data.drugs.length
+    } else {
+      drugs.value = []
+      total.value = 0
+    }
+  } catch (error) {
+    console.error('鎼滅储鑽搧澶辫触:', error)
+    ElMessage.error('鎼滅储鑽搧澶辫触')
+    drugs.value = []
+    total.value = 0
+  } finally {
+    loading.value = false
+  }
+}
+
+// 澶氶€夊彉鍖?
+const handleSelectionChange = (selection) => {
+  selectedDrugs.value = selection
+}
+
+// 鍒嗛〉
+const handleCurrentChange = (page) => {
+  currentPage.value = page
+  fetchDrugs()
+}
+
+// 鏃ユ湡鏍煎紡鍖?
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  
+  const date = new Date(dateString)
+  return date.toLocaleDateString()
+}
+
+// 鎵撳紑鏂板鑽搧瀵硅瘽妗?
+const openAddDialog = () => {
+  isEdit.value = false
+  resetForm()
+  dialogVisible.value = true
+}
+
+// 缂栬緫鑽搧
+const editDrug = (row) => {
+  isEdit.value = true
+  Object.keys(drugForm).forEach(key => {
+    drugForm[key] = row[key]
+  })
+  dialogVisible.value = true
+}
+
+// 鍒犻櫎鍗曚釜鑽搧
+const deleteDrug = (id) => {
+  ElMessageBox.confirm('纭畾瑕佸垹闄よ鑽搧鍚楋紵', '鎻愮ず', {
+    confirmButtonText: '纭畾',
+    cancelButtonText: '鍙栨秷',
+    type: 'warning'
+  }).then(async () => {
+    try {
+      const response = await axios.delete(`/api/drugs/${id}`)
+      if (response.data && response.data.status === 'success') {
+        ElMessage.success('鍒犻櫎鎴愬姛')
+        fetchDrugs()
+      } else {
+        ElMessage.error(response.data?.message || '鍒犻櫎澶辫触')
+      }
+    } catch (error) {
+      console.error('鍒犻櫎鑽搧澶辫触:', error)
+      ElMessage.error(error.response?.data?.message || '鍒犻櫎澶辫触')
+    }
+  }).catch(() => {})
+}
+
+// 鎵归噺鍒犻櫎鑽搧
+const batchDelete = () => {
+  if (selectedDrugs.value.length === 0) {
+    ElMessage.warning('璇烽€夋嫨瑕佸垹闄ょ殑鑽搧')
+    return
+  }
+  
+  ElMessageBox.confirm(`纭畾瑕佸垹闄ら€変腑鐨?${selectedDrugs.value.length} 涓嵂鍝佸悧锛焋, '鎻愮ず', {
+    confirmButtonText: '纭畾',
+    cancelButtonText: '鍙栨秷',
+    type: 'warning'
+  }).then(async () => {
+    try {
+      const ids = selectedDrugs.value.map(item => item.id)
+      const response = await axios.delete('/api/drugs/batch', {
+        data: ids
+      })
+      
+      if (response.data && response.data.status === 'success') {
+        ElMessage.success('鎵归噺鍒犻櫎鎴愬姛')
+        fetchDrugs()
+      } else {
+        ElMessage.error(response.data?.message || '鎵归噺鍒犻櫎澶辫触')
+      }
+    } catch (error) {
+      console.error('鎵归噺鍒犻櫎鑽搧澶辫触:', error)
+      ElMessage.error(error.response?.data?.message || '鎵归噺鍒犻櫎澶辫触')
+    }
+  }).catch(() => {})
+}
+
+// 閲嶇疆琛ㄥ崟
+const resetForm = () => {
+  if (drugFormRef.value) {
+    drugFormRef.value.resetFields()
+  }
+  
+  // 鎵嬪姩閲嶇疆琛ㄥ崟灞炴€?
+  Object.assign(drugForm, {
+    id: null,
+    name: '',
+    spec: '',
+    category: '',
+    stock: 0,
+    expirationDate: '',
+    supplier: ''
+  })
+}
+
+// 鎻愪氦琛ㄥ崟
+const submitForm = () => {
+  if (!drugFormRef.value) return
+  
+  drugFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    
+    try {
+      let response
+      
+      if (isEdit.value) {
+        // 缂栬緫鑽搧
+        response = await axios.put(`/api/drugs/${drugForm.id}`, drugForm)
+      } else {
+        // 鏂板鑽搧
+        response = await axios.post('/api/drugs', drugForm)
+      }
+      
+      if (response.data) {
+        ElMessage.success(isEdit.value ? '鑽搧鏇存柊鎴愬姛' : '鑽搧娣诲姞鎴愬姛')
+        dialogVisible.value = false
+        fetchDrugs()
+      } else {
+        ElMessage.error(response.data?.message || (isEdit.value ? '鏇存柊澶辫触' : '娣诲姞澶辫触'))
+      }
+    } catch (error) {
+      console.error(isEdit.value ? '鏇存柊鑽搧澶辫触:' : '娣诲姞鑽搧澶辫触:', error)
+      ElMessage.error(error.response?.data?.message || (isEdit.value ? '鏇存柊澶辫触' : '娣诲姞澶辫触'))
+    }
+  })
+}
+
+// 鑾峰彇鍗冲皢杩囨湡鐨勮嵂鍝?
+const fetchExpiringDrugs = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const response = await axios.get('/api/drugs/expiring?days=30', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    if (response.data && response.data.status === 'success') {
+      expiringDrugs.value = response.data.drugs
+    }
+  } catch (error) {
+    console.error('鑾峰彇杩囨湡棰勮鑽搧澶辫触:', error)
+  }
+}
+
+// 瀵煎嚭CSV
+const exportToCsv = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const response = await axios.get('/api/drugs/export', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      responseType: 'blob' // 浠ヤ簩杩涘埗鏁版嵁褰㈠紡鎺ユ敹鍝嶅簲
+    })
+    
+    // 鍒涘缓Blob瀵硅薄
+    const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8' })
+    
+    // 鍒涘缓涓嬭浇閾炬帴
+    const downloadLink = document.createElement('a')
+    downloadLink.href = URL.createObjectURL(blob)
+    downloadLink.download = 'drug_export.csv'
+    
+    // 娣诲姞鍒版枃妗ｅ苟瑙﹀彂鐐瑰嚮
+    document.body.appendChild(downloadLink)
+    downloadLink.click()
+    
+    // 娓呯悊
+    document.body.removeChild(downloadLink)
+    URL.revokeObjectURL(downloadLink.href)
+    
+    ElMessage.success('瀵煎嚭鎴愬姛')
+  } catch (error) {
+    console.error('瀵煎嚭鑽搧鏁版嵁澶辫触:', error)
+    ElMessage.error('瀵煎嚭鑽搧鏁版嵁澶辫触')
+  }
+}
+</script>
+
+<style scoped>
+.drug-management {
+  padding: 20px;
+}
+
+.page-title {
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: bold;
+  color: #409EFF;
+}
+
+.operation-area {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.search-input {
+  width: 300px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.expiring-warning {
+  margin-bottom: 20px;
+}
+
+.expiring-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.expiring-tag {
+  margin-right: 5px;
+}
+</style> 
+
+==== src\main\resources\static\js\DrugStatistics.vue ====
+<template>
+  <div class="statistics-container">
+    <h1 class="page-title">鑽搧缁熻</h1>
+    
+    <el-card class="chart-card">
+      <div id="category-chart" ref="categoryChart" class="chart"></div>
+    </el-card>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import axios from 'axios'
+import * as echarts from 'echarts/core'
+import { BarChart } from 'echarts/charts'
+import {
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent
+} from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+
+// 娉ㄥ唽 ECharts 蹇呴渶鐨勭粍浠?
+echarts.use([
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
+  BarChart,
+  CanvasRenderer
+])
+
+const categoryChart = ref(null)
+let chart = null
+
+onMounted(() => {
+  // 鍒濆鍖栧浘琛?
+  initChart()
+  
+  // 鍔犺浇鏁版嵁
+  fetchCategoryData()
+  
+  // 鍝嶅簲寮忚皟鏁村浘琛ㄥぇ灏?
+  window.addEventListener('resize', () => {
+    if (chart) {
+      chart.resize()
+    }
+  })
+})
+
+// 鍒濆鍖栧浘琛?
+const initChart = () => {
+  if (categoryChart.value) {
+    chart = echarts.init(categoryChart.value)
+    
+    // 璁剧疆鍒濆鍔犺浇鐘舵€?
+    chart.showLoading()
+  }
+}
+
+// 鑾峰彇鑽搧绫诲埆鏁版嵁
+const fetchCategoryData = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const response = await axios.get('/api/statistics/category', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    // 鏇存柊鍥捐〃
+    renderChart(response.data)
+  } catch (error) {
+    console.error('鑾峰彇鑽搧鍒嗙被缁熻鏁版嵁澶辫触:', error)
+    ElMessage.error('鑾峰彇鑽搧鍒嗙被缁熻鏁版嵁澶辫触')
+  }
+}
+
+// 娓叉煋鍥捐〃
+const renderChart = (data) => {
+  if (!chart) return
+  
+  // 闅愯棌鍔犺浇鐘舵€?
+  chart.hideLoading()
+  
+  // 濡傛灉娌℃湁鏁版嵁
+  if (!data || data.length === 0) {
+    chart.setOption({
+      title: {
+        text: '鏆傛棤鑽搧绫诲埆鏁版嵁',
+        left: 'center',
+        top: 'center',
+        textStyle: {
+          fontSize: 16,
+          color: '#999'
+        }
+      }
+    })
+    return
+  }
+  
+  // 鍑嗗鍥捐〃鏁版嵁
+  const categories = data.map(item => item.category)
+  const counts = data.map(item => item.count)
+  
+  // 璁剧疆鍥捐〃閰嶇疆
+  const option = {
+    title: {
+      text: '鑽搧绫诲埆鍒嗗竷缁熻',
+      left: 'center'
+    },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'shadow'
+      }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      data: categories,
+      axisLabel: {
+        interval: 0,
+        rotate: 30
+      }
+    },
+    yAxis: {
+      type: 'value',
+      name: '鏁伴噺'
+    },
+    series: [
+      {
+        name: '鑽搧鏁伴噺',
+        type: 'bar',
+        data: counts,
+        itemStyle: {
+          color: function(params) {
+            // 棰滆壊鍒楄〃
+            const colorList = [
+              '#5470c6', '#91cc75', '#fac858', '#ee6666',
+              '#73c0de', '#3ba272', '#fc8452', '#9a60b4'
+            ]
+            // 寰幆浣跨敤棰滆壊鍒楄〃
+            return colorList[params.dataIndex % colorList.length]
+          }
+        },
+        label: {
+          show: true,
+          position: 'top'
+        }
+      }
+    ]
+  }
+  
+  // 搴旂敤閰嶇疆
+  chart.setOption(option)
+}
+</script>
+
+<style scoped>
+.statistics-container {
+  padding: 20px;
+}
+
+.page-title {
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: bold;
+  color: #409EFF;
+}
+
+.chart-card {
+  margin-bottom: 20px;
+}
+
+.chart {
+  height: 500px;
+  width: 100%;
+}
+</style> 
+
+==== src\main\resources\static\js\LoginPage.vue ====
+<template>
+  <div class="login-container">
+    <el-card class="login-card">
+      <div class="login-header">
+        <h2>鍖婚櫌鑽搧绠＄悊绯荤粺</h2>
+      </div>
+      
+      <el-tabs v-model="activeTab">
+        <el-tab-pane label="鐧诲綍" name="login">
+          <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" label-width="0">
+            <el-form-item prop="username">
+              <el-input 
+                v-model="loginForm.username" 
+                placeholder="鐢ㄦ埛鍚? 
+                prefix-icon="User"
+                clearable
+              />
+            </el-form-item>
+            
+            <el-form-item prop="password">
+              <el-input 
+                v-model="loginForm.password" 
+                type="password" 
+                placeholder="瀵嗙爜" 
+                prefix-icon="Lock"
+                show-password
+                clearable
+                @keyup.enter="handleLogin"
+              />
+            </el-form-item>
+            
+            <el-form-item>
+              <el-button 
+                type="primary" 
+                class="action-button" 
+                :loading="loading" 
+                @click="handleLogin"
+              >
+                鐧诲綍
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-tab-pane>
+        
+        <el-tab-pane label="娉ㄥ唽" name="register">
+          <el-form ref="registerFormRef" :model="registerForm" :rules="registerRules" label-width="0">
+            <el-form-item prop="username">
+              <el-input 
+                v-model="registerForm.username" 
+                placeholder="鐢ㄦ埛鍚? 
+                prefix-icon="User"
+                clearable
+              />
+            </el-form-item>
+            
+            <el-form-item prop="password">
+              <el-input 
+                v-model="registerForm.password" 
+                type="password" 
+                placeholder="瀵嗙爜" 
+                prefix-icon="Lock"
+                show-password
+                clearable
+              />
+            </el-form-item>
+            
+            <el-form-item prop="confirmPassword">
+              <el-input 
+                v-model="registerForm.confirmPassword" 
+                type="password" 
+                placeholder="纭瀵嗙爜" 
+                prefix-icon="Lock"
+                show-password
+                clearable
+                @keyup.enter="handleRegister"
+              />
+            </el-form-item>
+            
+            <el-form-item>
+              <el-button 
+                type="primary" 
+                class="action-button" 
+                :loading="loading" 
+                @click="handleRegister"
+              >
+                娉ㄥ唽
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-tab-pane>
+      </el-tabs>
+    </el-card>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive } from 'vue'
+import { ElMessage } from 'element-plus'
+import { User, Lock } from '@element-plus/icons-vue'
+import axios from 'axios'
+
+const emit = defineEmits(['login-success'])
+
+// 褰撳墠婵€娲荤殑鏍囩椤?
+const activeTab = ref('login')
+
+// 鐧诲綍琛ㄥ崟
+const loginFormRef = ref(null)
+const loginForm = reactive({
+  username: '',
+  password: ''
+})
+
+// 娉ㄥ唽琛ㄥ崟
+const registerFormRef = ref(null)
+const registerForm = reactive({
+  username: '',
+  password: '',
+  confirmPassword: ''
+})
+
+// 鐧诲綍琛ㄥ崟楠岃瘉瑙勫垯
+const loginRules = {
+  username: [
+    { required: true, message: '璇疯緭鍏ョ敤鎴峰悕', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '璇疯緭鍏ュ瘑鐮?, trigger: 'blur' }
+  ]
+}
+
+// 娉ㄥ唽琛ㄥ崟楠岃瘉瑙勫垯
+const registerRules = {
+  username: [
+    { required: true, message: '璇疯緭鍏ョ敤鎴峰悕', trigger: 'blur' },
+    { min: 3, max: 20, message: '鐢ㄦ埛鍚嶉暱搴﹀簲涓?-20涓瓧绗?, trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '璇疯緭鍏ュ瘑鐮?, trigger: 'blur' },
+    { min: 6, max: 20, message: '瀵嗙爜闀垮害搴斾负6-20涓瓧绗?, trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '璇风‘璁ゅ瘑鐮?, trigger: 'blur' },
+    { 
+      validator: (rule, value, callback) => {
+        if (value !== registerForm.password) {
+          callback(new Error('涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷?))
+        } else {
+          callback()
+        }
+      }, 
+      trigger: 'blur' 
+    }
+  ]
+}
+
+// 鍔犺浇鐘舵€?
+const loading = ref(false)
+
+// 鐧诲綍澶勭悊
+const handleLogin = () => {
+  if (!loginFormRef.value) return
+  
+  loginFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    
+    loading.value = true
+    
+    try {
+      const response = await axios.post('/auth/login', loginForm)
+      
+      // 鐧诲綍鎴愬姛
+      if (response.data) {
+        // 浠庡搷搴斾腑鎻愬彇鐢ㄦ埛淇℃伅
+        const userData = {
+          id: response.data.id,
+          username: response.data.username || loginForm.username,
+          role: response.data.role
+        }
+        
+        // 瀛樺偍鐢ㄦ埛淇℃伅鍒版湰鍦板瓨鍌?
+        localStorage.setItem('user', JSON.stringify(userData))
+        // 瀛樺偍JWT浠ょ墝
+        localStorage.setItem('token', response.data.token)
+        
+        ElMessage.success('鐧诲綍鎴愬姛')
+        
+        // 閫氱煡鐖剁粍浠剁櫥褰曟垚鍔?
+        emit('login-success', userData)
+      } else {
+        ElMessage.error('鐧诲綍澶辫触')
+      }
+    } catch (error) {
+      console.error('鐧诲綍澶辫触:', error)
+      ElMessage.error(error.response?.data?.message || '鐧诲綍澶辫触锛岃妫€鏌ョ敤鎴峰悕鍜屽瘑鐮?)
+    } finally {
+      loading.value = false
+    }
+  })
+}
+
+// 娉ㄥ唽澶勭悊
+const handleRegister = () => {
+  if (!registerFormRef.value) return
+  
+  registerFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    
+    loading.value = true
+    
+    try {
+      const response = await axios.post('/auth/register', {
+        username: registerForm.username,
+        password: registerForm.password
+      })
+      
+      if (response.data) {
+        ElMessage.success('娉ㄥ唽鎴愬姛锛岃鐧诲綍')
+        // 鍒囨崲鍒扮櫥褰曠晫闈㈠苟濉厖鐢ㄦ埛鍚?
+        activeTab.value = 'login'
+        loginForm.username = registerForm.username
+        loginForm.password = ''
+        
+        // 閲嶇疆娉ㄥ唽琛ㄥ崟
+        if (registerFormRef.value) {
+          registerFormRef.value.resetFields()
+        }
+      }
+    } catch (error) {
+      console.error('娉ㄥ唽澶辫触:', error)
+      ElMessage.error(error.response?.data?.message || '娉ㄥ唽澶辫触锛岀敤鎴峰悕鍙兘宸插瓨鍦?)
+    } finally {
+      loading.value = false
+    }
+  })
+}
+</script>
+
+<style scoped>
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #f0f2f5;
+}
+
+.login-card {
+  width: 380px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.login-header h2 {
+  color: #409EFF;
+  font-weight: 600;
+}
+
+.action-button {
+  width: 100%;
+}
+</style> 
+
+==== src\main\resources\static\js\OperationLog.vue ====
+<template>
+  <div class="operation-log">
+    <h1 class="page-title">鎿嶄綔鏃ュ織</h1>
+    
+    <!-- 鎿嶄綔鍖哄煙 -->
+    <div class="operation-area">
+      <el-radio-group v-model="logType" @change="handleLogTypeChange">
+        <el-radio-button label="all">鎵€鏈夋棩蹇?/el-radio-button>
+        <el-radio-button label="my">鎴戠殑鏃ュ織</el-radio-button>
+      </el-radio-group>
+    </div>
+    
+    <!-- 鏃ュ織琛ㄦ牸 -->
+    <el-table
+      v-loading="loading"
+      :data="logs"
+      border
+      style="width: 100%"
+    >
+      <el-table-column prop="id" label="ID" width="80" />
+      <el-table-column prop="username" label="鎿嶄綔鐢ㄦ埛" min-width="120" />
+      <el-table-column label="鎿嶄綔绫诲瀷" min-width="120">
+        <template #default="scope">
+          <el-tag
+            :type="getActionTagType(scope.row.action)"
+          >
+            {{ getActionText(scope.row.action) }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="drugName" label="鑽搧鍚嶇О" min-width="150" />
+      <el-table-column prop="details" label="鎿嶄綔璇︽儏" min-width="200" />
+      <el-table-column label="鎿嶄綔鏃堕棿" min-width="180">
+        <template #default="scope">
+          {{ formatDateTime(scope.row.timestamp) }}
+        </template>
+      </el-table-column>
+    </el-table>
+    
+    <!-- 鍒嗛〉缁勪欢 -->
+    <div class="pagination-container">
+      <el-pagination
+        v-model:current-page="currentPage"
+        :page-size="pageSize"
+        layout="total, prev, pager, next, jumper"
+        :total="total"
+        @current-change="handleCurrentChange"
+      />
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import axios from 'axios'
+
+// 鏁版嵁鍒楄〃
+const logs = ref([])
+const loading = ref(false)
+const currentPage = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
+const logType = ref('all') // 'all' 鎴?'my'
+
+// 鍒濆鍖栬幏鍙栨暟鎹?
+onMounted(() => {
+  fetchLogs()
+})
+
+// 鑾峰彇鏃ュ織鍒楄〃
+const fetchLogs = async () => {
+  loading.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const endpoint = logType.value === 'my' ? '/api/logs/my' : '/api/logs'
+    
+    const response = await axios.get(endpoint, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    if (Array.isArray(response.data)) {
+      logs.value = response.data
+      total.value = response.data.length
+    } else {
+      logs.value = []
+      total.value = 0
+    }
+    
+    loading.value = false
+  } catch (error) {
+    console.error('鑾峰彇鎿嶄綔鏃ュ織澶辫触:', error)
+    ElMessage.error('鑾峰彇鎿嶄綔鏃ュ織澶辫触')
+    logs.value = []
+    total.value = 0
+    loading.value = false
+  }
+}
+
+// 澶勭悊鏃ュ織绫诲瀷鍙樺寲
+const handleLogTypeChange = () => {
+  currentPage.value = 1
+  fetchLogs()
+}
+
+// 鍒嗛〉
+const handleCurrentChange = (page) => {
+  currentPage.value = page
+  // 鍥犱负宸茬粡鑾峰彇浜嗘墍鏈夋棩蹇楋紝杩欓噷鍙仛鍓嶇鍒嗛〉
+}
+
+// 鏍煎紡鍖栨棩鏈熸椂闂?
+const formatDateTime = (dateTimeString) => {
+  if (!dateTimeString) return ''
+  
+  const date = new Date(dateTimeString)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+// 鑾峰彇鎿嶄綔绫诲瀷瀵瑰簲鐨勬爣绛剧被鍨?
+const getActionTagType = (action) => {
+  switch (action) {
+    case 'ADD':
+      return 'success'
+    case 'UPDATE':
+      return 'warning'
+    case 'DELETE':
+      return 'danger'
+    case 'BATCH_DELETE':
+      return 'danger'
+    default:
+      return 'info'
+  }
+}
+
+// 鑾峰彇鎿嶄綔绫诲瀷瀵瑰簲鐨勬枃鏈?
+const getActionText = (action) => {
+  switch (action) {
+    case 'ADD':
+      return '娣诲姞'
+    case 'UPDATE':
+      return '鏇存柊'
+    case 'DELETE':
+      return '鍒犻櫎'
+    case 'BATCH_DELETE':
+      return '鎵归噺鍒犻櫎'
+    default:
+      return action
+  }
+}
+</script>
+
+<style scoped>
+.operation-log {
+  padding: 20px;
+}
+
+.page-title {
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: bold;
+  color: #409EFF;
+}
+
+.operation-area {
+  margin-bottom: 20px;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  text-align: center;
+}
+</style> 
+
+==== src\main\resources\static\js\SystemSettings.vue ====
+<template>
+  <div class="settings-container">
+    <h1 class="page-title">绯荤粺璁剧疆</h1>
+    
+    <!-- 鎿嶄綔鍖哄煙 -->
+    <div class="operation-area">
+      <el-button type="primary" @click="openAddDialog">
+        <el-icon><Plus /></el-icon> 娣诲姞璁剧疆
+      </el-button>
+    </div>
+    
+    <!-- 璁剧疆琛ㄦ牸 -->
+    <el-table
+      v-loading="loading"
+      :data="settings"
+      border
+      style="width: 100%"
+    >
+      <el-table-column prop="settingKey" label="璁剧疆閿? min-width="150" />
+      <el-table-column prop="settingValue" label="璁剧疆鍊? min-width="150" />
+      <el-table-column prop="description" label="鎻忚堪" min-width="200" />
+      <el-table-column label="鎿嶄綔" width="180" fixed="right">
+        <template #default="scope">
+          <el-button 
+            type="primary" 
+            size="small" 
+            @click="editSetting(scope.row)"
+          >
+            缂栬緫
+          </el-button>
+          <el-button 
+            type="danger" 
+            size="small" 
+            @click="deleteSetting(scope.row)"
+          >
+            鍒犻櫎
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    
+    <!-- 娣诲姞/缂栬緫璁剧疆瀵硅瘽妗?-->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '缂栬緫璁剧疆' : '娣诲姞璁剧疆'"
+      width="500px"
+    >
+      <el-form :model="settingForm" label-width="100px" :rules="rules" ref="settingFormRef">
+        <el-form-item label="璁剧疆閿? prop="settingKey" :disabled="isEdit">
+          <el-input v-model="settingForm.settingKey" placeholder="璇疯緭鍏ヨ缃敭" :disabled="isEdit" />
+        </el-form-item>
+        <el-form-item label="璁剧疆鍊? prop="settingValue">
+          <el-input v-model="settingForm.settingValue" placeholder="璇疯緭鍏ヨ缃€? />
+        </el-form-item>
+        <el-form-item label="鎻忚堪" prop="description">
+          <el-input v-model="settingForm.description" placeholder="璇疯緭鍏ユ弿杩? />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">鍙栨秷</el-button>
+        <el-button type="primary" @click="saveSetting">纭</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
+import axios from 'axios'
+
+// 鏁版嵁鍒楄〃
+const settings = ref([])
+const loading = ref(false)
+
+// 瀵硅瘽妗嗙姸鎬?
+const dialogVisible = ref(false)
+const isEdit = ref(false)
+const settingFormRef = ref(null)
+const settingForm = reactive({
+  settingKey: '',
+  settingValue: '',
+  description: ''
+})
+
+// 琛ㄥ崟楠岃瘉瑙勫垯
+const rules = {
+  settingKey: [
+    { required: true, message: '璇疯緭鍏ヨ缃敭', trigger: 'blur' },
+    { pattern: /^[a-z0-9.]+$/, message: '璁剧疆閿彧鑳藉寘鍚皬鍐欏瓧姣嶃€佹暟瀛楀拰鐐?, trigger: 'blur' }
+  ],
+  settingValue: [
+    { required: true, message: '璇疯緭鍏ヨ缃€?, trigger: 'blur' }
+  ]
+}
+
+// 鍒濆鍖栬幏鍙栨暟鎹?
+onMounted(() => {
+  fetchSettings()
+})
+
+// 鑾峰彇璁剧疆鍒楄〃
+const fetchSettings = async () => {
+  loading.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const response = await axios.get('/api/settings', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    if (Array.isArray(response.data)) {
+      settings.value = response.data
+    } else {
+      settings.value = []
+      ElMessage.warning('鑾峰彇璁剧疆鍒楄〃鏁版嵁鏍煎紡涓嶆纭?)
+    }
+    
+    loading.value = false
+  } catch (error) {
+    console.error('鑾峰彇璁剧疆鍒楄〃澶辫触:', error)
+    ElMessage.error('鑾峰彇璁剧疆鍒楄〃澶辫触')
+    settings.value = []
+    loading.value = false
+  }
+}
+
+// 鎵撳紑娣诲姞璁剧疆瀵硅瘽妗?
+const openAddDialog = () => {
+  isEdit.value = false
+  resetForm()
+  dialogVisible.value = true
+}
+
+// 鎵撳紑缂栬緫璁剧疆瀵硅瘽妗?
+const editSetting = (setting) => {
+  isEdit.value = true
+  resetForm()
+  
+  // 濉厖琛ㄥ崟鏁版嵁
+  settingForm.settingKey = setting.settingKey
+  settingForm.settingValue = setting.settingValue
+  settingForm.description = setting.description
+  
+  dialogVisible.value = true
+}
+
+// 閲嶇疆琛ㄥ崟
+const resetForm = () => {
+  if (settingFormRef.value) {
+    settingFormRef.value.resetFields()
+  }
+  
+  // 鎵嬪姩閲嶇疆琛ㄥ崟灞炴€?
+  Object.assign(settingForm, {
+    settingKey: '',
+    settingValue: '',
+    description: ''
+  })
+}
+
+// 淇濆瓨璁剧疆
+const saveSetting = () => {
+  if (!settingFormRef.value) return
+  
+  settingFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.post('/api/settings', settingForm, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.data && response.data.status === 'success') {
+        ElMessage.success(isEdit.value ? '璁剧疆鏇存柊鎴愬姛' : '璁剧疆娣诲姞鎴愬姛')
+        dialogVisible.value = false
+        fetchSettings()
+      } else {
+        ElMessage.error(response.data?.message || '鎿嶄綔澶辫触')
+      }
+    } catch (error) {
+      console.error('淇濆瓨璁剧疆澶辫触:', error)
+      ElMessage.error(error.response?.data?.message || '淇濆瓨璁剧疆澶辫触')
+    }
+  })
+}
+
+// 鍒犻櫎璁剧疆
+const deleteSetting = (setting) => {
+  ElMessageBox.confirm(`纭畾瑕佸垹闄よ缃?${setting.settingKey} 鍚楋紵`, '鎻愮ず', {
+    confirmButtonText: '纭畾',
+    cancelButtonText: '鍙栨秷',
+    type: 'warning'
+  }).then(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.delete(`/api/settings/${setting.settingKey}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.data && response.data.status === 'success') {
+        ElMessage.success('璁剧疆鍒犻櫎鎴愬姛')
+        fetchSettings()
+      } else {
+        ElMessage.error(response.data?.message || '鍒犻櫎澶辫触')
+      }
+    } catch (error) {
+      console.error('鍒犻櫎璁剧疆澶辫触:', error)
+      ElMessage.error(error.response?.data?.message || '鍒犻櫎璁剧疆澶辫触')
+    }
+  }).catch(() => {})
+}
+</script>
+
+<style scoped>
+.settings-container {
+  padding: 20px;
+}
+
+.page-title {
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: bold;
+  color: #409EFF;
+}
+
+.operation-area {
+  margin-bottom: 20px;
+}
+</style> 
+
+==== src\main\resources\static\js\UserManagement.vue ====
+<template>
+  <div class="user-management">
+    <h1 class="page-title">鐢ㄦ埛绠＄悊</h1>
+    
+    <!-- 鎿嶄綔鍖哄煙 -->
+    <div class="operation-area">
+      <el-button type="primary" @click="openAddDialog">
+        <el-icon><Plus /></el-icon> 鏂板鐢ㄦ埛
+      </el-button>
+    </div>
+    
+    <!-- 鐢ㄦ埛鍒楄〃 -->
+    <el-table
+      v-loading="loading"
+      :data="users"
+      border
+      style="width: 100%"
+    >
+      <el-table-column prop="id" label="ID" width="80" />
+      <el-table-column prop="username" label="鐢ㄦ埛鍚? min-width="150" />
+      <el-table-column label="瑙掕壊" min-width="150">
+        <template #default="scope">
+          <el-tag :type="scope.row.role === 'ADMIN' ? 'danger' : 'success'">
+            {{ scope.row.role }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="鎿嶄綔" width="220" fixed="right">
+        <template #default="scope">
+          <el-button 
+            type="warning" 
+            size="small" 
+            @click="changeRole(scope.row)"
+            :disabled="scope.row.username === currentUsername"
+          >
+            {{ scope.row.role === 'ADMIN' ? '璁句负鏅€氱敤鎴? : '璁句负绠＄悊鍛? }}
+          </el-button>
+          <el-button 
+            type="danger" 
+            size="small" 
+            @click="deleteUser(scope.row)"
+            :disabled="scope.row.username === currentUsername"
+          >
+            鍒犻櫎
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    
+    <!-- 鏂板鐢ㄦ埛瀵硅瘽妗?-->
+    <el-dialog
+      v-model="dialogVisible"
+      title="鏂板鐢ㄦ埛"
+      width="500px"
+    >
+      <el-form :model="userForm" label-width="100px" :rules="rules" ref="userFormRef">
+        <el-form-item label="鐢ㄦ埛鍚? prop="username">
+          <el-input v-model="userForm.username" placeholder="璇疯緭鍏ョ敤鎴峰悕" />
+        </el-form-item>
+        <el-form-item label="瀵嗙爜" prop="password">
+          <el-input v-model="userForm.password" type="password" placeholder="璇疯緭鍏ュ瘑鐮? show-password />
+        </el-form-item>
+        <el-form-item label="纭瀵嗙爜" prop="confirmPassword">
+          <el-input v-model="userForm.confirmPassword" type="password" placeholder="璇风‘璁ゅ瘑鐮? show-password />
+        </el-form-item>
+        <el-form-item label="瑙掕壊" prop="role">
+          <el-select v-model="userForm.role" placeholder="璇烽€夋嫨瑙掕壊">
+            <el-option label="绠＄悊鍛? value="ADMIN" />
+            <el-option label="鏅€氱敤鎴? value="USER" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">鍙栨秷</el-button>
+        <el-button type="primary" @click="submitForm">纭</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
+import axios from 'axios'
+
+// 鏁版嵁鍒楄〃
+const users = ref([])
+const loading = ref(false)
+const currentUsername = ref('') // 褰撳墠鐧诲綍鐢ㄦ埛鍚?
+
+// 寮圭獥鐩稿叧
+const dialogVisible = ref(false)
+const userFormRef = ref(null)
+const userForm = reactive({
+  username: '',
+  password: '',
+  confirmPassword: '',
+  role: 'USER'
+})
+
+// 琛ㄥ崟楠岃瘉瑙勫垯
+const rules = {
+  username: [
+    { required: true, message: '璇疯緭鍏ョ敤鎴峰悕', trigger: 'blur' },
+    { min: 3, max: 20, message: '闀垮害鍦?3 鍒?20 涓瓧绗?, trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '璇疯緭鍏ュ瘑鐮?, trigger: 'blur' },
+    { min: 6, max: 20, message: '闀垮害鍦?6 鍒?20 涓瓧绗?, trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '璇风‘璁ゅ瘑鐮?, trigger: 'blur' },
+    { 
+      validator: (rule, value, callback) => {
+        if (value !== userForm.password) {
+          callback(new Error('涓ゆ杈撳叆鐨勫瘑鐮佷笉涓€鑷?))
+        } else {
+          callback()
+        }
+      }, 
+      trigger: 'blur' 
+    }
+  ],
+  role: [
+    { required: true, message: '璇烽€夋嫨瑙掕壊', trigger: 'change' }
+  ]
+}
+
+// 鍒濆鍖栬幏鍙栨暟鎹?
+onMounted(() => {
+  // 鑾峰彇褰撳墠鐢ㄦ埛淇℃伅
+  const userStr = localStorage.getItem('user')
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr)
+      currentUsername.value = user.username
+    } catch (e) {
+      console.error('瑙ｆ瀽鐢ㄦ埛鏁版嵁澶辫触', e)
+    }
+  }
+  
+  fetchUsers()
+})
+
+// 鑾峰彇鐢ㄦ埛鍒楄〃
+const fetchUsers = async () => {
+  loading.value = true
+  try {
+    const token = localStorage.getItem('token')
+    const response = await axios.get('/api/users', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    users.value = response.data
+    loading.value = false
+  } catch (error) {
+    console.error('鑾峰彇鐢ㄦ埛鍒楄〃澶辫触:', error)
+    ElMessage.error('鑾峰彇鐢ㄦ埛鍒楄〃澶辫触')
+    loading.value = false
+  }
+}
+
+// 鎵撳紑鏂板鐢ㄦ埛瀵硅瘽妗?
+const openAddDialog = () => {
+  resetForm()
+  dialogVisible.value = true
+}
+
+// 閲嶇疆琛ㄥ崟
+const resetForm = () => {
+  if (userFormRef.value) {
+    userFormRef.value.resetFields()
+  }
+  
+  // 鎵嬪姩閲嶇疆琛ㄥ崟灞炴€?
+  Object.assign(userForm, {
+    username: '',
+    password: '',
+    confirmPassword: '',
+    role: 'USER'
+  })
+}
+
+// 鎻愪氦琛ㄥ崟
+const submitForm = () => {
+  if (!userFormRef.value) return
+  
+  userFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.post('/api/users', {
+        username: userForm.username,
+        password: userForm.password,
+        role: userForm.role
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.data && response.data.status === 'success') {
+        ElMessage.success('鐢ㄦ埛鍒涘缓鎴愬姛')
+        dialogVisible.value = false
+        fetchUsers()
+      } else {
+        ElMessage.error(response.data?.message || '鍒涘缓澶辫触')
+      }
+    } catch (error) {
+      console.error('鍒涘缓鐢ㄦ埛澶辫触:', error)
+      ElMessage.error(error.response?.data?.message || '鍒涘缓鐢ㄦ埛澶辫触')
+    }
+  })
+}
+
+// 鏇存敼鐢ㄦ埛瑙掕壊
+const changeRole = (user) => {
+  const newRole = user.role === 'ADMIN' ? 'USER' : 'ADMIN'
+  const roleText = newRole === 'ADMIN' ? '绠＄悊鍛? : '鏅€氱敤鎴?
+  
+  ElMessageBox.confirm(`纭畾灏嗙敤鎴?${user.username} 瑙掕壊鏇存敼涓?{roleText}鍚楋紵`, '鎻愮ず', {
+    confirmButtonText: '纭畾',
+    cancelButtonText: '鍙栨秷',
+    type: 'warning'
+  }).then(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.put(`/api/users/${user.id}`, {
+        role: newRole
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.data && response.data.status === 'success') {
+        ElMessage.success('瑙掕壊鏇存柊鎴愬姛')
+        fetchUsers()
+      } else {
+        ElMessage.error(response.data?.message || '鏇存柊澶辫触')
+      }
+    } catch (error) {
+      console.error('鏇存柊鐢ㄦ埛瑙掕壊澶辫触:', error)
+      ElMessage.error(error.response?.data?.message || '鏇存柊鐢ㄦ埛瑙掕壊澶辫触')
+    }
+  }).catch(() => {})
+}
+
+// 鍒犻櫎鐢ㄦ埛
+const deleteUser = (user) => {
+  ElMessageBox.confirm(`纭畾瑕佸垹闄ょ敤鎴?${user.username} 鍚楋紵姝ゆ搷浣滀笉鍙仮澶嶏紒`, '璀﹀憡', {
+    confirmButtonText: '纭畾',
+    cancelButtonText: '鍙栨秷',
+    type: 'warning'
+  }).then(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.delete(`/api/users/${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.data && response.data.status === 'success') {
+        ElMessage.success('鐢ㄦ埛鍒犻櫎鎴愬姛')
+        fetchUsers()
+      } else {
+        ElMessage.error(response.data?.message || '鍒犻櫎澶辫触')
+      }
+    } catch (error) {
+      console.error('鍒犻櫎鐢ㄦ埛澶辫触:', error)
+      ElMessage.error(error.response?.data?.message || '鍒犻櫎鐢ㄦ埛澶辫触')
+    }
+  }).catch(() => {})
+}
+</script>
+
+<style scoped>
+.user-management {
+  padding: 20px;
+}
+
+.page-title {
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: bold;
+  color: #409EFF;
+}
+
+.operation-area {
+  margin-bottom: 20px;
+}
+</style> 
+

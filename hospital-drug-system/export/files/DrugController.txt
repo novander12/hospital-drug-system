@@ -1,0 +1,279 @@
+﻿==========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\controller\DrugController.java
+==========================================================================
+
+package com.example.hospital.controller;
+
+import com.example.hospital.model.Drug;
+import com.example.hospital.repository.DrugRepository;
+import com.example.hospital.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+
+import java.net.URI;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/api/drugs")
+public class DrugController {
+
+    @Autowired
+    private DrugRepository drugRepository;
+    
+    @Autowired
+    private UserService userService;
+
+    /**
+     * 获取所有药品 (所有用户都可访问)
+     */
+    @GetMapping
+    public ResponseEntity<List<Drug>> getAllDrugs() {
+        List<Drug> drugs = drugRepository.findAll();
+        return ResponseEntity.ok(drugs);
+    }
+
+    /**
+     * 根据ID获取药品 (所有用户都可访问)
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getDrugById(@PathVariable Long id) {
+        Optional<Drug> drug = drugRepository.findById(id);
+        if (drug.isPresent()) {
+            return ResponseEntity.ok(drug.get());
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "药品不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
+    /**
+     * 创建新药品 (仅管理员可访问)
+     */
+    @PostMapping
+    public ResponseEntity<?> createDrug(@RequestBody Drug drug, @RequestHeader("X-Username") String username) {
+        // 检查用户权限
+        if (!userService.isAdmin(username)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "权限不足，仅管理员可创建药品");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        Drug savedDrug = drugRepository.save(drug);
+        
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(savedDrug.getId())
+                .toUri();
+        
+        return ResponseEntity.created(location).body(savedDrug);
+    }
+
+    /**
+     * 批量创建药品 (仅管理员可访问)
+     */
+    @PostMapping("/batch")
+    public ResponseEntity<?> createDrugs(@RequestBody List<Drug> drugs, @RequestHeader("X-Username") String username) {
+        // 检查用户权限
+        if (!userService.isAdmin(username)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "权限不足，仅管理员可批量创建药品");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        List<Drug> savedDrugs = drugRepository.saveAll(drugs);
+        return ResponseEntity.status(HttpStatus.CREATED).body(savedDrugs);
+    }
+
+    /**
+     * 更新药品信息 (仅管理员可访问)
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateDrug(@PathVariable Long id, @RequestBody Drug drugDetails, @RequestHeader("X-Username") String username) {
+        // 检查用户权限
+        if (!userService.isAdmin(username)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "权限不足，仅管理员可更新药品");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        Optional<Drug> optionalDrug = drugRepository.findById(id);
+        if (optionalDrug.isPresent()) {
+            Drug drug = optionalDrug.get();
+            drug.setName(drugDetails.getName());
+            drug.setSpec(drugDetails.getSpec());
+            drug.setStock(drugDetails.getStock());
+            drug.setExpirationDate(drugDetails.getExpirationDate());
+            drug.setSupplier(drugDetails.getSupplier());
+            drug.setCategory(drugDetails.getCategory());
+            Drug updatedDrug = drugRepository.save(drug);
+            return ResponseEntity.ok(updatedDrug);
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "药品不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
+    /**
+     * 局部更新药品信息 (仅管理员可访问)
+     */
+    @PatchMapping("/{id}")
+    public ResponseEntity<?> partialUpdateDrug(@PathVariable Long id, @RequestBody Map<String, Object> updates, @RequestHeader("X-Username") String username) {
+        // 检查用户权限
+        if (!userService.isAdmin(username)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "权限不足，仅管理员可更新药品");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        Optional<Drug> optionalDrug = drugRepository.findById(id);
+        if (optionalDrug.isPresent()) {
+            Drug drug = optionalDrug.get();
+            
+            // 根据提供的字段进行更新
+            if (updates.containsKey("name")) {
+                drug.setName((String) updates.get("name"));
+            }
+            if (updates.containsKey("spec")) {
+                drug.setSpec((String) updates.get("spec"));
+            }
+            if (updates.containsKey("stock")) {
+                drug.setStock((Integer) updates.get("stock"));
+            }
+            if (updates.containsKey("supplier")) {
+                drug.setSupplier((String) updates.get("supplier"));
+            }
+            if (updates.containsKey("category")) {
+                drug.setCategory((String) updates.get("category"));
+            }
+            if (updates.containsKey("expirationDate")) {
+                drug.setExpirationDate(java.time.LocalDate.parse((String) updates.get("expirationDate")));
+            }
+            
+            Drug updatedDrug = drugRepository.save(drug);
+            return ResponseEntity.ok(updatedDrug);
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "药品不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
+    /**
+     * 删除药品 (仅管理员可访问)
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteDrug(@PathVariable Long id, @RequestHeader("X-Username") String username) {
+        // 检查用户权限
+        if (!userService.isAdmin(username)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "权限不足，仅管理员可删除药品");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        Optional<Drug> optionalDrug = drugRepository.findById(id);
+        if (optionalDrug.isPresent()) {
+            drugRepository.deleteById(id);
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "药品已删除");
+            return ResponseEntity.ok(response);
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "药品不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+    
+    /**
+     * 批量删除药品 (仅管理员可访问)
+     */
+    @DeleteMapping("/batch")
+    public ResponseEntity<?> deleteDrugs(@RequestBody List<Long> ids, @RequestHeader("X-Username") String username) {
+        // 检查用户权限
+        if (!userService.isAdmin(username)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "权限不足，仅管理员可批量删除药品");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        ids.forEach(id -> {
+            if (drugRepository.existsById(id)) {
+                drugRepository.deleteById(id);
+            }
+        });
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "已批量删除药品");
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 根据药品名称进行模糊搜索 (所有用户都可访问)
+     * @param name 药品名称关键词
+     * @return 匹配的药品列表
+     */
+    @GetMapping("/search")
+    public ResponseEntity<?> searchDrugsByName(@RequestParam String name) {
+        if (name == null || name.trim().isEmpty()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "搜索关键词不能为空");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        List<Drug> matchedDrugs = drugRepository.findByNameContainingIgnoreCase(name.trim());
+        
+        Map<String, Object> response = new HashMap<>();
+        if (matchedDrugs.isEmpty()) {
+            response.put("status", "info");
+            response.put("message", "未找到匹配的药品");
+        } else {
+            response.put("status", "success");
+            response.put("message", "找到" + matchedDrugs.size() + "条匹配记录");
+        }
+        response.put("drugs", matchedDrugs);
+        
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 查询库存低于50的药品 (所有用户都可访问)
+     * @return 库存低的药品列表
+     */
+    @GetMapping("/low-stock")
+    public ResponseEntity<?> getLowStockDrugs() {
+        List<Drug> lowStockDrugs = drugRepository.findByStockLessThan(50);
+        
+        Map<String, Object> response = new HashMap<>();
+        if (lowStockDrugs.isEmpty()) {
+            response.put("status", "info");
+            response.put("message", "没有库存低于50的药品");
+        } else {
+            response.put("status", "warning");
+            response.put("message", "发现" + lowStockDrugs.size() + "种药品库存低于50");
+        }
+        response.put("drugs", lowStockDrugs);
+        
+        return ResponseEntity.ok(response);
+    }
+} 

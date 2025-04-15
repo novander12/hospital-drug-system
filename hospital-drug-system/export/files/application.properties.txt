@@ -1,0 +1,39 @@
+﻿==========================================================================
+鏂囦欢璺緞: .\src\main\resources\application.properties
+==========================================================================
+
+# 数据源配置
+spring.datasource.url=jdbc:h2:mem:hospitaldb
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=password
+
+# JPA配置
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+
+# H2 控制台配置
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+
+# 服务器配置
+server.port=8082
+
+# 日志配置
+logging.level.org.springframework.web=INFO
+logging.level.org.hibernate=ERROR
+logging.level.com.example.hospital=DEBUG
+
+# 静态资源配置
+spring.web.resources.static-locations=classpath:/static/dist/
+spring.mvc.static-path-pattern=/**
+spring.web.resources.chain.strategy.content.enabled=true
+spring.web.resources.chain.strategy.content.paths=/**
+
+# 开发环境配置
+spring.devtools.restart.enabled=true
+spring.devtools.livereload.enabled=true
+
+# 允许循环依赖（作为最后的解决方案）
+spring.main.allow-circular-references=true 

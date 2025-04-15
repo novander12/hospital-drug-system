@@ -1,0 +1,16 @@
+﻿==========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\HospitalDrugSystemApplication.java
+==========================================================================
+
+package com.example.hospital;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class HospitalDrugSystemApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(HospitalDrugSystemApplication.class, args);
+    }
+} 

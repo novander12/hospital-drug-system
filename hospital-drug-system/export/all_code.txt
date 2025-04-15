@@ -1,0 +1,2717 @@
+﻿==== src\main\java\com\example\hospital\HospitalDrugSystemApplication.java ====
+package com.example.hospital;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class HospitalDrugSystemApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(HospitalDrugSystemApplication.class, args);
+    }
+} 
+
+==== src\main\java\com\example\hospital\config\DataInitializer.java ====
+package com.example.hospital.config;
+
+import com.example.hospital.model.User;
+import com.example.hospital.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DataInitializer implements CommandLineRunner {
+
+    @Autowired
+    private UserService userService;
+    
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Override
+    public void run(String... args) throws Exception {
+        // 妫€鏌ユ槸鍚﹀凡鏈夌鐞嗗憳鐢ㄦ埛
+        User existingAdmin = userService.findByUsername("admin");
+        if (existingAdmin == null) {
+            // 鍒涘缓榛樿绠＄悊鍛樼敤鎴?
+            User adminUser = new User();
+            adminUser.setUsername("admin");
+            String rawPassword = "admin123";
+            adminUser.setPassword(rawPassword);
+            adminUser.setRole("ADMIN");
+            User savedAdmin = userService.createUser(adminUser);
+            
+            // 娴嬭瘯瀵嗙爜鏄惁鍖归厤
+            boolean passwordMatches = passwordEncoder.matches(rawPassword, savedAdmin.getPassword());
+            
+            System.out.println("宸插垱寤洪粯璁ょ鐞嗗憳鐢ㄦ埛: admin/admin123");
+            System.out.println("鍔犲瘑鍚庡瘑鐮? " + savedAdmin.getPassword());
+            System.out.println("瀵嗙爜鍖归厤娴嬭瘯: " + passwordMatches);
+        } else {
+            System.out.println("宸插瓨鍦ㄧ鐞嗗憳鐢ㄦ埛: " + existingAdmin.getUsername());
+            // 灏濊瘯浣跨敤宸茬煡瀵嗙爜杩涜鍖归厤娴嬭瘯
+            boolean passwordMatches = passwordEncoder.matches("admin123", existingAdmin.getPassword());
+            System.out.println("瀵嗙爜鍖归厤娴嬭瘯: " + passwordMatches);
+        }
+        
+        // 妫€鏌ユ槸鍚﹀凡鏈夋櫘閫氱敤鎴?
+        if (userService.findByUsername("user") == null) {
+            // 鍒涘缓榛樿鏅€氱敤鎴?
+            User normalUser = new User();
+            normalUser.setUsername("user");
+            String rawPassword = "user123";
+            normalUser.setPassword(rawPassword);
+            normalUser.setRole("USER");
+            User savedUser = userService.createUser(normalUser);
+            
+            System.out.println("宸插垱寤洪粯璁ゆ櫘閫氱敤鎴? user/user123");
+            System.out.println("鍔犲瘑鍚庡瘑鐮? " + savedUser.getPassword());
+        }
+    }
+} 
+
+==== src\main\java\com\example\hospital\config\SecurityConfig.java ====
+package com.example.hospital.config;
+
+import com.example.hospital.repository.UserRepository;
+import com.example.hospital.security.JwtRequestFilter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.Collections;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    private final UserRepository userRepository;
+    private final JwtRequestFilter jwtRequestFilter;
+
+    @Autowired
+    public SecurityConfig(UserRepository userRepository, JwtRequestFilter jwtRequestFilter) {
+        this.userRepository = userRepository;
+        this.jwtRequestFilter = jwtRequestFilter;
+    }
+    
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .cors().and().csrf().disable()  // 鍦ㄧ敓浜х幆澧冧腑搴斿惎鐢–SRF淇濇姢
+            .authorizeRequests()
+                .antMatchers("/api/users/login", "/api/users/register", "/api/users/check").permitAll()
+                .antMatchers("/api/test/**").permitAll()
+                .antMatchers("/auth/**").permitAll()
+                .antMatchers("/api/drugs/admin/**").hasRole("ADMIN")
+                .antMatchers("/api/settings/**").hasRole("ADMIN")
+                .antMatchers("/api/drugs/**").permitAll()
+                .antMatchers("/", "/js/**", "/css/**", "/assets/**", "/h2-console/**").permitAll()
+                .anyRequest().authenticated()
+                .and()
+            .sessionManagement()
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // 涓嶅垱寤簊ession
+                .and()
+            .formLogin()
+                .disable()
+            .logout()
+                .permitAll()
+                .and()
+            .headers().frameOptions().disable(); // 涓轰簡H2鎺у埗鍙板彲浠ユ甯歌闂?
+        
+        // 娣诲姞JWT杩囨护鍣?
+        http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+        
+        return http.build();
+    }
+    
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:8081", "http://localhost:63342", "http://127.0.0.1:5500", "http://localhost:5173"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(false);
+        configuration.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+    
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> {
+            com.example.hospital.model.User user = userRepository.findByUsername(username);
+            if (user == null) {
+                throw new UsernameNotFoundException("鐢ㄦ埛涓嶅瓨鍦?);
+            }
+            return new org.springframework.security.core.userdetails.User(
+                user.getUsername(),
+                user.getPassword(),
+                Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + user.getRole()))
+            );
+        };
+    }
+    
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+        return authConfig.getAuthenticationManager();
+    }
+    
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+} 
+
+==== src\main\java\com\example\hospital\config\WebConfig.java ====
+package com.example.hospital.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowedOrigins("*")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
+                .maxAge(3600);
+    }
+} 
+
+==== src\main\java\com\example\hospital\controller\AuthController.java ====
+package com.example.hospital.controller;
+
+import com.example.hospital.model.User;
+import com.example.hospital.service.UserService;
+import com.example.hospital.util.JwtUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * 璁よ瘉鎺у埗鍣紝澶勭悊鐢ㄦ埛鐧诲綍绛夎璇佺浉鍏虫搷浣?
+ */
+@RestController
+@RequestMapping("/auth")
+public class AuthController {
+
+    @Autowired
+    private UserService userService;
+    
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    /**
+     * 鐢ㄦ埛鐧诲綍鎺ュ彛
+     * @param loginRequest 鍖呭惈鐢ㄦ埛鍚嶅拰瀵嗙爜鐨勮姹備綋
+     * @return 鐧诲綍缁撴灉
+     */
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody Map<String, String> loginRequest) {
+        String username = loginRequest.get("username");
+        String password = loginRequest.get("password");
+        
+        // 楠岃瘉璇锋眰鍙傛暟
+        if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鐢ㄦ埛鍚嶅拰瀵嗙爜涓嶈兘涓虹┖");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+        
+        // 楠岃瘉鐢ㄦ埛韬唤
+        User user = userService.authenticate(username, password);
+        
+        if (user != null) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "鐧诲綍鎴愬姛");
+            
+            // 鍒涘缓鐢ㄦ埛淇℃伅(涓嶅寘鍚瘑鐮?
+            Map<String, Object> userInfo = new HashMap<>();
+            userInfo.put("id", user.getId());
+            userInfo.put("username", user.getUsername());
+            userInfo.put("role", user.getRole());
+            response.put("user", userInfo);
+            
+            // 鐢熸垚JWT浠ょ墝
+            String token = jwtUtil.generateToken(user);
+            response.put("token", token);
+            
+            return ResponseEntity.ok(response);
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鐢ㄦ埛鍚嶆垨瀵嗙爜閿欒");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+    }
+    
+    /**
+     * 妫€鏌ョ敤鎴锋潈闄?
+     * @param username 鐢ㄦ埛鍚?
+     * @return 鏉冮檺淇℃伅
+     */
+    @GetMapping("/check-permission")
+    public ResponseEntity<?> checkPermission(@RequestParam String username) {
+        Map<String, Object> response = new HashMap<>();
+        
+        boolean isAdmin = userService.isAdmin(username);
+        response.put("isAdmin", isAdmin);
+        
+        if (isAdmin) {
+            response.put("permissions", "full");
+            response.put("message", "绠＄悊鍛樻嫢鏈夋墍鏈夋搷浣滄潈闄?);
+        } else {
+            response.put("permissions", "read-only");
+            response.put("message", "鏅€氱敤鎴蜂粎鏈夋煡鐪嬫潈闄?);
+        }
+        
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * 鐢ㄦ埛娉ㄥ唽鎺ュ彛
+     * @param registerRequest 鍖呭惈鐢ㄦ埛娉ㄥ唽淇℃伅鐨勮姹備綋
+     * @return 娉ㄥ唽缁撴灉
+     */
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody Map<String, String> registerRequest) {
+        String username = registerRequest.get("username");
+        String password = registerRequest.get("password");
+        String role = registerRequest.get("role");
+        
+        // 楠岃瘉璇锋眰鍙傛暟
+        if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鐢ㄦ埛鍚嶅拰瀵嗙爜涓嶈兘涓虹┖");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+        
+        // 妫€鏌ョ敤鎴峰悕鏄惁宸插瓨鍦?
+        if (userService.findByUsername(username) != null) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鐢ㄦ埛鍚嶅凡瀛樺湪");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+        
+        // 鍒涘缓鏂扮敤鎴?
+        User newUser = new User();
+        newUser.setUsername(username);
+        newUser.setPassword(password);
+        newUser.setRole(role != null && !role.isEmpty() ? role : "USER");
+        
+        User createdUser = userService.createUser(newUser);
+        
+        // 鍒涘缓鍝嶅簲
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "娉ㄥ唽鎴愬姛");
+        
+        // 鍒涘缓鐢ㄦ埛淇℃伅(涓嶅寘鍚瘑鐮?
+        Map<String, Object> userInfo = new HashMap<>();
+        userInfo.put("id", createdUser.getId());
+        userInfo.put("username", createdUser.getUsername());
+        userInfo.put("role", createdUser.getRole());
+        response.put("user", userInfo);
+        
+        // 鐢熸垚JWT浠ょ墝锛屽疄鐜版敞鍐屽悗鑷姩鐧诲綍
+        String token = jwtUtil.generateToken(createdUser);
+        response.put("token", token);
+        
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+} 
+
+==== src\main\java\com\example\hospital\controller\DrugController.java ====
+package com.example.hospital.controller;
+
+import com.example.hospital.model.Drug;
+import com.example.hospital.repository.DrugRepository;
+import com.example.hospital.service.OperationLogService;
+import com.example.hospital.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import javax.validation.Valid;
+
+import java.net.URI;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+
+@RestController
+@RequestMapping("/api/drugs")
+public class DrugController {
+
+    @Autowired
+    private DrugRepository drugRepository;
+    
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private OperationLogService operationLogService;
+
+    /**
+     * 鑾峰彇褰撳墠璁よ瘉鐢ㄦ埛鐨勭敤鎴峰悕
+     */
+    private String getCurrentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null ? authentication.getName() : null;
+    }
+
+    /**
+     * 妫€鏌ュ綋鍓嶇敤鎴锋槸鍚︽湁绠＄悊鍛樻潈闄?
+     */
+    private boolean isCurrentUserAdmin() {
+        String username = getCurrentUsername();
+        return username != null && userService.isAdmin(username);
+    }
+
+    /**
+     * 鑾峰彇鎵€鏈夎嵂鍝?(鎵€鏈夌敤鎴烽兘鍙闂?
+     */
+    @GetMapping
+    public ResponseEntity<List<Drug>> getAllDrugs() {
+        List<Drug> drugs = drugRepository.findAll();
+        return ResponseEntity.ok(drugs);
+    }
+
+    /**
+     * 鏍规嵁ID鑾峰彇鑽搧 (鎵€鏈夌敤鎴烽兘鍙闂?
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getDrugById(@PathVariable Long id) {
+        Optional<Drug> drug = drugRepository.findById(id);
+        if (drug.isPresent()) {
+            return ResponseEntity.ok(drug.get());
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鑽搧涓嶅瓨鍦?);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
+    /**
+     * 鍒涘缓鏂拌嵂鍝?(浠呯鐞嗗憳鍙闂?
+     */
+    @PostMapping
+    public ResponseEntity<?> createDrug(@Valid @RequestBody Drug drug) {
+        // 妫€鏌ョ敤鎴锋潈闄?
+        if (!isCurrentUserAdmin()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鏉冮檺涓嶈冻锛屼粎绠＄悊鍛樺彲鍒涘缓鑽搧");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        // 娣诲姞鍩烘湰楠岃瘉
+        if (drug.getStock() == null || drug.getStock() < 0) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鑽搧搴撳瓨涓嶈兘涓鸿礋鏁?);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+        
+        Drug savedDrug = drugRepository.save(drug);
+        
+        // 璁板綍鎿嶄綔鏃ュ織
+        operationLogService.logAddDrug(savedDrug);
+        
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(savedDrug.getId())
+                .toUri();
+        
+        return ResponseEntity.created(location).body(savedDrug);
+    }
+
+    /**
+     * 鎵归噺鍒涘缓鑽搧 (浠呯鐞嗗憳鍙闂?
+     */
+    @PostMapping("/batch")
+    public ResponseEntity<?> createDrugs(@RequestBody List<Drug> drugs) {
+        // 妫€鏌ョ敤鎴锋潈闄?
+        if (!isCurrentUserAdmin()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鏉冮檺涓嶈冻锛屼粎绠＄悊鍛樺彲鎵归噺鍒涘缓鑽搧");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        List<Drug> savedDrugs = drugRepository.saveAll(drugs);
+        return ResponseEntity.status(HttpStatus.CREATED).body(savedDrugs);
+    }
+
+    /**
+     * 鏇存柊鑽搧淇℃伅 (浠呯鐞嗗憳鍙闂?
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateDrug(@PathVariable Long id, @RequestBody Drug drugDetails) {
+        // 妫€鏌ョ敤鎴锋潈闄?
+        if (!isCurrentUserAdmin()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鏉冮檺涓嶈冻锛屼粎绠＄悊鍛樺彲鏇存柊鑽搧");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        Optional<Drug> optionalDrug = drugRepository.findById(id);
+        if (optionalDrug.isPresent()) {
+            Drug drug = optionalDrug.get();
+            Drug oldDrug = new Drug(); // 淇濆瓨鏃у€肩敤浜庢棩蹇?
+            oldDrug.setId(drug.getId());
+            oldDrug.setName(drug.getName());
+            oldDrug.setSpec(drug.getSpec());
+            oldDrug.setStock(drug.getStock());
+            oldDrug.setExpirationDate(drug.getExpirationDate());
+            oldDrug.setSupplier(drug.getSupplier());
+            oldDrug.setCategory(drug.getCategory());
+            
+            drug.setName(drugDetails.getName());
+            drug.setSpec(drugDetails.getSpec());
+            drug.setStock(drugDetails.getStock());
+            drug.setExpirationDate(drugDetails.getExpirationDate());
+            drug.setSupplier(drugDetails.getSupplier());
+            drug.setCategory(drugDetails.getCategory());
+            Drug updatedDrug = drugRepository.save(drug);
+            
+            // 璁板綍鎿嶄綔鏃ュ織
+            operationLogService.logUpdateDrug(oldDrug, updatedDrug);
+            
+            return ResponseEntity.ok(updatedDrug);
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鑽搧涓嶅瓨鍦?);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
+    /**
+     * 灞€閮ㄦ洿鏂拌嵂鍝佷俊鎭?(浠呯鐞嗗憳鍙闂?
+     */
+    @PatchMapping("/{id}")
+    public ResponseEntity<?> partialUpdateDrug(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
+        // 妫€鏌ョ敤鎴锋潈闄?
+        if (!isCurrentUserAdmin()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鏉冮檺涓嶈冻锛屼粎绠＄悊鍛樺彲鏇存柊鑽搧");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        Optional<Drug> optionalDrug = drugRepository.findById(id);
+        if (optionalDrug.isPresent()) {
+            Drug drug = optionalDrug.get();
+            
+            // 鏍规嵁鎻愪緵鐨勫瓧娈佃繘琛屾洿鏂?
+            if (updates.containsKey("name")) {
+                drug.setName((String) updates.get("name"));
+            }
+            if (updates.containsKey("spec")) {
+                drug.setSpec((String) updates.get("spec"));
+            }
+            if (updates.containsKey("stock")) {
+                drug.setStock((Integer) updates.get("stock"));
+            }
+            if (updates.containsKey("supplier")) {
+                drug.setSupplier((String) updates.get("supplier"));
+            }
+            if (updates.containsKey("category")) {
+                drug.setCategory((String) updates.get("category"));
+            }
+            if (updates.containsKey("expirationDate")) {
+                drug.setExpirationDate(java.time.LocalDate.parse((String) updates.get("expirationDate")));
+            }
+            
+            Drug updatedDrug = drugRepository.save(drug);
+            return ResponseEntity.ok(updatedDrug);
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鑽搧涓嶅瓨鍦?);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
+    /**
+     * 鍒犻櫎鑽搧 (浠呯鐞嗗憳鍙闂?
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteDrug(@PathVariable Long id) {
+        // 妫€鏌ョ敤鎴锋潈闄?
+        if (!isCurrentUserAdmin()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鏉冮檺涓嶈冻锛屼粎绠＄悊鍛樺彲鍒犻櫎鑽搧");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        Optional<Drug> optionalDrug = drugRepository.findById(id);
+        if (optionalDrug.isPresent()) {
+            Drug drug = optionalDrug.get();
+            
+            // 璁板綍鎿嶄綔鏃ュ織
+            operationLogService.logDeleteDrug(drug);
+            
+            drugRepository.deleteById(id);
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "鑽搧宸插垹闄?);
+            return ResponseEntity.ok(response);
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鑽搧涓嶅瓨鍦?);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+    
+    /**
+     * 鎵归噺鍒犻櫎鑽搧 (浠呯鐞嗗憳鍙闂?
+     */
+    @DeleteMapping("/batch")
+    public ResponseEntity<?> deleteDrugs(@RequestBody List<Long> ids) {
+        // 妫€鏌ョ敤鎴锋潈闄?
+        if (!isCurrentUserAdmin()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鏉冮檺涓嶈冻锛屼粎绠＄悊鍛樺彲鎵归噺鍒犻櫎鑽搧");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        List<Drug> drugsToDelete = new ArrayList<>();
+        
+        ids.forEach(id -> {
+            Optional<Drug> drug = drugRepository.findById(id);
+            drug.ifPresent(drugsToDelete::add);
+        });
+        
+        if (!drugsToDelete.isEmpty()) {
+            // 璁板綍鎿嶄綔鏃ュ織
+            operationLogService.logBatchDeleteDrugs(drugsToDelete);
+            
+            ids.forEach(id -> {
+                if (drugRepository.existsById(id)) {
+                    drugRepository.deleteById(id);
+                }
+            });
+        }
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "宸叉壒閲忓垹闄よ嵂鍝?);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 鏍规嵁鑽搧鍚嶇О杩涜妯＄硦鎼滅储 (鎵€鏈夌敤鎴烽兘鍙闂?
+     * @param name 鑽搧鍚嶇О鍏抽敭璇?
+     * @return 鍖归厤鐨勮嵂鍝佸垪琛?
+     */
+    @GetMapping("/search")
+    public ResponseEntity<?> searchDrugsByName(@RequestParam String name) {
+        if (name == null || name.trim().isEmpty()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鎼滅储鍏抽敭璇嶄笉鑳戒负绌?);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        List<Drug> matchedDrugs = drugRepository.findByNameContainingIgnoreCase(name.trim());
+        
+        Map<String, Object> response = new HashMap<>();
+        if (matchedDrugs.isEmpty()) {
+            response.put("status", "info");
+            response.put("message", "鏈壘鍒板尮閰嶇殑鑽搧");
+        } else {
+            response.put("status", "success");
+            response.put("message", "鎵惧埌" + matchedDrugs.size() + "鏉″尮閰嶈褰?);
+        }
+        response.put("drugs", matchedDrugs);
+        
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 鑾峰彇搴撳瓨棰勮鑽搧鍒楄〃锛堝簱瀛樹綆浜庨槇鍊肩殑鑽搧锛?
+     */
+    @GetMapping("/low-stock")
+    public ResponseEntity<?> getLowStockDrugs() {
+        final int LOW_STOCK_THRESHOLD = 10; // 搴撳瓨棰勮闃堝€?
+        List<Drug> lowStockDrugs = drugRepository.findByStockLessThan(LOW_STOCK_THRESHOLD);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("count", lowStockDrugs.size());
+        response.put("message", "鍏辨壘鍒? + lowStockDrugs.size() + "绉嶅簱瀛樹笉瓒崇殑鑽搧");
+        response.put("data", lowStockDrugs);
+        
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 鑾峰彇鍗冲皢杩囨湡鐨勮嵂鍝佸垪琛?
+     */
+    @GetMapping("/expiring")
+    public ResponseEntity<?> getExpiringDrugs(@RequestParam(value = "days", defaultValue = "30") int days) {
+        LocalDate endDate = LocalDate.now().plusDays(days);
+        List<Drug> expiringDrugs = drugRepository.findExpiringDrugs(endDate);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("count", expiringDrugs.size());
+        response.put("drugs", expiringDrugs);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 瀵煎嚭鑽搧涓篊SV鏂囦欢
+     */
+    @GetMapping("/export")
+    public ResponseEntity<?> exportDrugsToCSV() {
+        List<Drug> drugs = drugRepository.findAll();
+        
+        if (drugs.isEmpty()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "娌℃湁鍙鍑虹殑鑽搧鏁版嵁");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+        
+        // 浣跨敤StringBuilder鏋勫缓CSV鍐呭
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter printWriter = new PrintWriter(stringWriter);
+        
+        // 娣诲姞CSV澶撮儴
+        printWriter.println("ID,鑽搧鍚嶇О,瑙勬牸,绫诲埆,搴撳瓨,鏈夋晥鏈?渚涘簲鍟?);
+        
+        // 娣诲姞鏁版嵁琛?
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        drugs.forEach(drug -> {
+            StringBuilder line = new StringBuilder();
+            line.append(drug.getId()).append(",");
+            line.append(escapeCSV(drug.getName())).append(",");
+            line.append(escapeCSV(drug.getSpec())).append(",");
+            line.append(escapeCSV(drug.getCategory())).append(",");
+            line.append(drug.getStock()).append(",");
+            line.append(drug.getExpirationDate() != null ? drug.getExpirationDate().format(formatter) : "").append(",");
+            line.append(escapeCSV(drug.getSupplier()));
+            printWriter.println(line.toString());
+        });
+        
+        byte[] csvBytes = stringWriter.toString().getBytes(StandardCharsets.UTF_8);
+        
+        // 璁剧疆HTTP鍝嶅簲澶?
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("text/csv;charset=UTF-8"));
+        headers.setContentDispositionFormData("attachment", "drug_export.csv");
+        headers.setContentLength(csvBytes.length);
+        
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(csvBytes);
+    }
+
+    /**
+     * 杞箟CSV瀛楁涓殑鐗规畩瀛楃
+     */
+    private String escapeCSV(String field) {
+        if (field == null) {
+            return "";
+        }
+        
+        // 濡傛灉瀛楁鍖呭惈閫楀彿銆佸弻寮曞彿鎴栨崲琛岀锛屽垯鐢ㄥ弻寮曞彿鍖呭洿骞跺皢瀛楁涓殑鍙屽紩鍙锋浛鎹负涓や釜鍙屽紩鍙?
+        if (field.contains(",") || field.contains("\"") || field.contains("\n")) {
+            return "\"" + field.replace("\"", "\"\"") + "\"";
+        }
+        
+        return field;
+    }
+} 
+
+==== src\main\java\com\example\hospital\controller\OperationLogController.java ====
+package com.example.hospital.controller;
+
+import com.example.hospital.model.OperationLog;
+import com.example.hospital.service.OperationLogService;
+import com.example.hospital.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/logs")
+public class OperationLogController {
+
+    @Autowired
+    private OperationLogService operationLogService;
+    
+    @Autowired
+    private UserService userService;
+    
+    /**
+     * 妫€鏌ュ綋鍓嶇敤鎴锋槸鍚︽湁绠＄悊鍛樻潈闄?
+     */
+    private boolean isCurrentUserAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication != null ? authentication.getName() : null;
+        return username != null && userService.isAdmin(username);
+    }
+    
+    /**
+     * 鑾峰彇鎵€鏈夋搷浣滄棩蹇?
+     */
+    @GetMapping
+    public ResponseEntity<?> getAllLogs() {
+        // 妫€鏌ョ敤鎴锋潈闄?
+        if (!isCurrentUserAdmin()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鏉冮檺涓嶈冻锛屼粎绠＄悊鍛樺彲鏌ョ湅鎿嶄綔鏃ュ織");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        List<OperationLog> logs = operationLogService.findAllLogs();
+        return ResponseEntity.ok(logs);
+    }
+    
+    /**
+     * 鑾峰彇褰撳墠鐢ㄦ埛鐨勬搷浣滄棩蹇?
+     */
+    @GetMapping("/my")
+    public ResponseEntity<?> getMyLogs() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        
+        List<OperationLog> logs = operationLogService.findLogsByUsername(username);
+        return ResponseEntity.ok(logs);
+    }
+    
+    /**
+     * 鑾峰彇鎸囧畾鑽搧鐨勬搷浣滄棩蹇?
+     */
+    @GetMapping("/drug/{id}")
+    public ResponseEntity<?> getDrugLogs(@PathVariable Long id) {
+        // 妫€鏌ョ敤鎴锋潈闄?
+        if (!isCurrentUserAdmin()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鏉冮檺涓嶈冻锛屼粎绠＄悊鍛樺彲鏌ョ湅鑽搧鎿嶄綔鏃ュ織");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+        
+        List<OperationLog> logs = operationLogService.findLogsByDrugId(id);
+        return ResponseEntity.ok(logs);
+    }
+} 
+
+==== src\main\java\com\example\hospital\controller\StatisticsController.java ====
+package com.example.hospital.controller;
+
+import com.example.hospital.model.Drug;
+import com.example.hospital.model.StockHistory;
+import com.example.hospital.repository.DrugRepository;
+import com.example.hospital.repository.StockHistoryRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * 缁熻鏁版嵁鎺у埗鍣紝鎻愪緵鍚勭被鏁版嵁缁熻鎺ュ彛
+ */
+@RestController
+@RequestMapping("/api/statistics")
+public class StatisticsController {
+
+    @Autowired
+    private DrugRepository drugRepository;
+
+    @Autowired
+    private StockHistoryRepository stockHistoryRepository;
+
+    /**
+     * 鑾峰彇鎸夎嵂鍝佺被鍒垎缁勭殑缁熻
+     */
+    @GetMapping("/category")
+    public ResponseEntity<?> getStatisticsByCategory() {
+        List<Drug> drugs = drugRepository.findAll();
+        
+        // 鎸夌被鍒垎缁勫苟璁℃暟
+        Map<String, Long> categoryCountMap = drugs.stream()
+                .filter(drug -> drug.getCategory() != null && !drug.getCategory().isEmpty())
+                .collect(Collectors.groupingBy(
+                        Drug::getCategory,
+                        Collectors.counting()
+                ));
+        
+        // 杞崲涓哄墠绔渶瑕佺殑鏍煎紡
+        List<Map<String, Object>> result = new ArrayList<>();
+        categoryCountMap.forEach((category, count) -> {
+            Map<String, Object> item = new HashMap<>();
+            item.put("category", category);
+            item.put("count", count);
+            result.add(item);
+        });
+        
+        return ResponseEntity.ok(result);
+    }
+    
+    /**
+     * 缁熻鑽搧搴撳瓨鎯呭喌
+     * @return 搴撳瓨鎯呭喌缁熻
+     */
+    @GetMapping("/inventory")
+    public ResponseEntity<?> getInventoryStats() {
+        List<Drug> allDrugs = drugRepository.findAll();
+        
+        int totalDrugs = allDrugs.size();
+        int lowStockCount = 0;
+        int normalStockCount = 0;
+        int highStockCount = 0;
+        
+        // 搴撳瓨闃堝€煎畾涔?
+        final int LOW_STOCK_THRESHOLD = 10;
+        final int HIGH_STOCK_THRESHOLD = 100;
+        
+        for (Drug drug : allDrugs) {
+            int stock = drug.getStock();
+            if (stock < LOW_STOCK_THRESHOLD) {
+                lowStockCount++;
+            } else if (stock > HIGH_STOCK_THRESHOLD) {
+                highStockCount++;
+            } else {
+                normalStockCount++;
+            }
+        }
+        
+        Map<String, Object> stockData = new HashMap<>();
+        stockData.put("lowStock", lowStockCount);
+        stockData.put("normalStock", normalStockCount);
+        stockData.put("highStock", highStockCount);
+        stockData.put("totalDrugs", totalDrugs);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "搴撳瓨鎯呭喌缁熻瀹屾垚");
+        response.put("data", stockData);
+        
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * 涓哄吋瀹规€ф彁渚涚殑鍒悕鎺ュ彛
+     */
+    @GetMapping("/drugs")
+    public ResponseEntity<?> getDrugStats() {
+        return getStatisticsByCategory();
+    }
+
+    /**
+     * 鑾峰彇搴撳瓨鍘嗗彶缁熻
+     */
+    @GetMapping("/stock-history")
+    public ResponseEntity<?> getStockHistory(@RequestParam(value = "days", defaultValue = "30") int days) {
+        LocalDate startDate = LocalDate.now().minusDays(days);
+        List<StockHistory> stockHistoryList = stockHistoryRepository.findStockHistoryInRange(startDate);
+        
+        // 杞崲涓哄墠绔渶瑕佺殑鏍煎紡
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        List<Map<String, Object>> result = stockHistoryList.stream().map(history -> {
+            Map<String, Object> item = new HashMap<>();
+            item.put("date", history.getDate().format(formatter));
+            item.put("totalStock", history.getTotalStock());
+            return item;
+        }).collect(Collectors.toList());
+        
+        return ResponseEntity.ok(result);
+    }
+} 
+
+==== src\main\java\com\example\hospital\controller\SystemSettingController.java ====
+package com.example.hospital.controller;
+
+import com.example.hospital.model.SystemSetting;
+import com.example.hospital.service.SystemSettingService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+@RestController
+@RequestMapping("/api/settings")
+public class SystemSettingController {
+
+    @Autowired
+    private SystemSettingService systemSettingService;
+
+    /**
+     * 鑾峰彇鎵€鏈夌郴缁熻缃?
+     * @return 绯荤粺璁剧疆鍒楄〃
+     */
+    @GetMapping
+    public ResponseEntity<List<SystemSetting>> getAllSettings() {
+        return ResponseEntity.ok(systemSettingService.getAllSettings());
+    }
+
+    /**
+     * 鏍规嵁閿幏鍙栫郴缁熻缃?
+     * @param key 璁剧疆閿?
+     * @return 绯荤粺璁剧疆
+     */
+    @GetMapping("/{key}")
+    public ResponseEntity<SystemSetting> getSettingByKey(@PathVariable String key) {
+        SystemSetting setting = systemSettingService.getSetting(key);
+        return setting != null 
+                ? ResponseEntity.ok(setting) 
+                : ResponseEntity.notFound().build();
+    }
+
+    /**
+     * 鏇存柊鎴栧垱寤虹郴缁熻缃垪琛?
+     * @param settings 绯荤粺璁剧疆鍒楄〃
+     * @return 鏇存柊鍚庣殑绯荤粺璁剧疆鍒楄〃
+     */
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<SystemSetting>> saveSettings(@RequestBody List<SystemSetting> settings) {
+        List<SystemSetting> savedSettings = settings.stream()
+                .map(systemSettingService::saveSetting)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(savedSettings);
+    }
+
+    /**
+     * 鏇存柊鍗曚釜绯荤粺璁剧疆
+     * @param key 璁剧疆閿?
+     * @param setting 绯荤粺璁剧疆
+     * @return 鏇存柊鍚庣殑绯荤粺璁剧疆
+     */
+    @PutMapping("/{key}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<SystemSetting> updateSetting(@PathVariable String key, @RequestBody SystemSetting setting) {
+        if (!key.equals(setting.getSettingKey())) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(systemSettingService.saveSetting(setting));
+    }
+
+    /**
+     * 鍒犻櫎绯荤粺璁剧疆
+     * @param key 璁剧疆閿?
+     * @return 鏃犲唴瀹瑰搷搴?
+     */
+    @DeleteMapping("/{key}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteSetting(@PathVariable String key) {
+        systemSettingService.deleteSetting(key);
+        return ResponseEntity.noContent().build();
+    }
+}
+
+==== src\main\java\com\example\hospital\controller\TestController.java ====
+package com.example.hospital.controller;
+
+import com.example.hospital.model.User;
+import com.example.hospital.repository.UserRepository;
+import com.example.hospital.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/test")
+public class TestController {
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    
+    @Autowired
+    private UserService userService;
+    
+    @Autowired
+    private UserRepository userRepository;
+
+    @GetMapping("/password")
+    public Map<String, Object> testPassword(@RequestParam(defaultValue = "admin123") String rawPassword) {
+        Map<String, Object> result = new HashMap<>();
+        
+        // 鍔犲瘑瀵嗙爜
+        String encodedPassword = passwordEncoder.encode(rawPassword);
+        
+        // 妫€鏌ユ槸鍚﹀尮閰?
+        boolean matches = passwordEncoder.matches(rawPassword, encodedPassword);
+        
+        // 鍥哄畾鐨勫姞瀵嗗瘑鐮佺敤浜庢祴璇?
+        String fixedEncodedPassword = "$2a$10$QUARTc5q2yrBL3nEKRH1WOqsW0.UNzfO0n/2GbkxGKbVJllSqzJna";
+        boolean matchesFixed = passwordEncoder.matches(rawPassword, fixedEncodedPassword);
+        
+        result.put("rawPassword", rawPassword);
+        result.put("encodedPassword", encodedPassword);
+        result.put("passwordLength", encodedPassword.length());
+        result.put("matches", matches);
+        result.put("fixedEncodedPassword", fixedEncodedPassword);
+        result.put("matchesFixed", matchesFixed);
+        
+        return result;
+    }
+    
+    @GetMapping("/reset-admin")
+    public Map<String, Object> resetAdminPassword() {
+        Map<String, Object> result = new HashMap<>();
+        
+        User admin = userService.findByUsername("admin");
+        if (admin != null) {
+            // 鐩存帴璁剧疆涓哄浐瀹氱殑鍔犲瘑瀵嗙爜
+            String originalPassword = "admin123";
+            String encodedPassword = passwordEncoder.encode(originalPassword);
+            admin.setPassword(encodedPassword);
+            userRepository.save(admin);
+            
+            result.put("status", "success");
+            result.put("message", "绠＄悊鍛樺瘑鐮佸凡閲嶇疆涓?admin123");
+            result.put("encodedPassword", encodedPassword);
+            result.put("passwordLength", encodedPassword.length());
+            result.put("matches", passwordEncoder.matches(originalPassword, encodedPassword));
+        } else {
+            result.put("status", "error");
+            result.put("message", "鎵句笉鍒扮鐞嗗憳鐢ㄦ埛");
+        }
+        
+        return result;
+    }
+    
+    @PostMapping("/login")
+    public Map<String, Object> testLogin(@RequestBody Map<String, String> loginRequest) {
+        Map<String, Object> result = new HashMap<>();
+        
+        String username = loginRequest.get("username");
+        String password = loginRequest.get("password");
+        
+        result.put("username", username);
+        
+        User user = userRepository.findByUsername(username);
+        if (user != null) {
+            result.put("userFound", true);
+            result.put("encodedPassword", user.getPassword());
+            result.put("passwordLength", user.getPassword().length());
+            
+            boolean matches = passwordEncoder.matches(password, user.getPassword());
+            result.put("passwordMatches", matches);
+            
+            if (matches) {
+                result.put("status", "success");
+                result.put("message", "鐧诲綍鎴愬姛");
+                
+                Map<String, Object> userInfo = new HashMap<>();
+                userInfo.put("id", user.getId());
+                userInfo.put("username", user.getUsername());
+                userInfo.put("role", user.getRole());
+                result.put("user", userInfo);
+            } else {
+                result.put("status", "error");
+                result.put("message", "瀵嗙爜涓嶅尮閰?);
+            }
+        } else {
+            result.put("userFound", false);
+            result.put("status", "error");
+            result.put("message", "鐢ㄦ埛涓嶅瓨鍦?);
+        }
+        
+        return result;
+    }
+} 
+
+==== src\main\java\com\example\hospital\controller\TestSettingController.java ====
+package com.example.hospital.controller;
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/test-settings")
+public class TestSettingController {
+
+    @GetMapping
+    public Map<String, Object> getTest() {
+        Map<String, Object> result = new HashMap<>();
+        result.put("message", "娴嬭瘯璁剧疆鎺у埗鍣ㄦ甯稿伐浣?);
+        result.put("status", "success");
+        return result;
+    }
+} 
+
+==== src\main\java\com\example\hospital\controller\UserController.java ====
+package com.example.hospital.controller;
+
+import com.example.hospital.model.User;
+import com.example.hospital.service.UserService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/users")
+public class UserController {
+
+    @Autowired
+    private UserService userService;
+
+    /**
+     * 妫€鏌ュ綋鍓嶇敤鎴锋槸鍚︽湁绠＄悊鍛樻潈闄?
+     */
+    private boolean isCurrentUserAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication != null ? authentication.getName() : null;
+        return username != null && userService.isAdmin(username);
+    }
+
+    /**
+     * 鑾峰彇鎵€鏈夌敤鎴?(浠呯鐞嗗憳鍙闂?
+     */
+    @GetMapping
+    public ResponseEntity<?> getAllUsers() {
+        // 妫€鏌ユ潈闄?
+        if (!isCurrentUserAdmin()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鏉冮檺涓嶈冻锛屼粎绠＄悊鍛樺彲鏌ョ湅鐢ㄦ埛鍒楄〃");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+
+        List<User> users = userService.findAllUsers();
+        // 绉婚櫎瀵嗙爜瀛楁
+        users.forEach(user -> user.setPassword(null));
+        return ResponseEntity.ok(users);
+    }
+
+    /**
+     * 鍒涘缓鏂扮敤鎴?(浠呯鐞嗗憳鍙闂?
+     */
+    @PostMapping
+    public ResponseEntity<?> createUser(@RequestBody User user) {
+        // 妫€鏌ユ潈闄?
+        if (!isCurrentUserAdmin()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鏉冮檺涓嶈冻锛屼粎绠＄悊鍛樺彲鍒涘缓鐢ㄦ埛");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+
+        // 妫€鏌ョ敤鎴峰悕鏄惁宸插瓨鍦?
+        if (userService.userExists(user.getUsername())) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鐢ㄦ埛鍚嶅凡瀛樺湪");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+
+        User savedUser = userService.createUser(user.getUsername(), user.getPassword(), user.getRole());
+        // 绉婚櫎瀵嗙爜瀛楁
+        savedUser.setPassword(null);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "鐢ㄦ埛鍒涘缓鎴愬姛");
+        response.put("user", savedUser);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * 鏇存柊鐢ㄦ埛瑙掕壊 (浠呯鐞嗗憳鍙闂?
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody User user) {
+        // 妫€鏌ユ潈闄?
+        if (!isCurrentUserAdmin()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鏉冮檺涓嶈冻锛屼粎绠＄悊鍛樺彲鏇存柊鐢ㄦ埛");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+
+        try {
+            User updatedUser = userService.updateUserRole(id, user.getRole());
+            // 绉婚櫎瀵嗙爜瀛楁
+            updatedUser.setPassword(null);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "鐢ㄦ埛鏇存柊鎴愬姛");
+            response.put("user", updatedUser);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
+    /**
+     * 鍒犻櫎鐢ㄦ埛 (浠呯鐞嗗憳鍙闂?
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+        // 妫€鏌ユ潈闄?
+        if (!isCurrentUserAdmin()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鏉冮檺涓嶈冻锛屼粎绠＄悊鍛樺彲鍒犻櫎鐢ㄦ埛");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+
+        // 妫€鏌ユ槸鍚︿负褰撳墠鐢ㄦ埛锛屼笉鍏佽鍒犻櫎鑷繁
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUsername = authentication.getName();
+        User userToDelete = userService.findById(id);
+        
+        if (userToDelete == null) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "鐢ㄦ埛涓嶅瓨鍦?);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+        
+        if (userToDelete.getUsername().equals(currentUsername)) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", "涓嶈兘鍒犻櫎褰撳墠鐧诲綍鐨勭敤鎴?);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+
+        try {
+            userService.deleteUser(id);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "鐢ㄦ埛鍒犻櫎鎴愬姛");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody Map<String, String> loginRequest) {
+        String username = loginRequest.get("username");
+        String password = loginRequest.get("password");
+        
+        System.out.println("灏濊瘯鐧诲綍: 鐢ㄦ埛鍚?" + username + ", 瀵嗙爜闀垮害=" + (password != null ? password.length() : 0));
+        
+        User user = userService.authenticate(username, password);
+        
+        if (user != null) {
+            System.out.println("鐧诲綍鎴愬姛: " + user);
+            Map<String, Object> response = createSuccessResponse("鐧诲綍鎴愬姛", user);
+            return ResponseEntity.ok(response);
+        } else {
+            System.out.println("鐧诲綍澶辫触: 鐢ㄦ埛鍚嶆垨瀵嗙爜閿欒");
+            return ResponseEntity.badRequest().body(createErrorResponse("鐢ㄦ埛鍚嶆垨瀵嗙爜閿欒"));
+        }
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody User user) {
+        // 妫€鏌ョ敤鎴峰悕鏄惁宸插瓨鍦?
+        if (userService.findByUsername(user.getUsername()) != null) {
+            return ResponseEntity.badRequest().body(createErrorResponse("鐢ㄦ埛鍚嶅凡瀛樺湪"));
+        }
+        
+        // 浣跨敤Service灞傚垱寤虹敤鎴?
+        User savedUser = userService.createUser(user);
+        
+        Map<String, Object> response = createSuccessResponse("娉ㄥ唽鎴愬姛", savedUser);
+        return ResponseEntity.ok(response);
+    }
+    
+    @GetMapping("/check")
+    public ResponseEntity<?> checkUser(@RequestParam String username) {
+        User user = userService.findByUsername(username);
+        if (user != null) {
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("id", user.getId());
+            userData.put("username", user.getUsername());
+            userData.put("role", user.getRole());
+            userData.put("passwordLength", user.getPassword().length());
+            
+            return ResponseEntity.ok(userData);
+        } else {
+            return ResponseEntity.badRequest().body(createErrorResponse("鐢ㄦ埛涓嶅瓨鍦?));
+        }
+    }
+    
+    /**
+     * 鍒涘缓鎴愬姛鍝嶅簲
+     */
+    private Map<String, Object> createSuccessResponse(String message, Object data) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", message);
+        response.put("data", data);
+        return response;
+    }
+    
+    /**
+     * 鍒涘缓閿欒鍝嶅簲
+     */
+    private Map<String, Object> createErrorResponse(String message) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "error");
+        response.put("message", message);
+        return response;
+    }
+} 
+
+==== src\main\java\com\example\hospital\model\Drug.java ====
+package com.example.hospital.model;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Future;
+import java.time.LocalDate;
+
+@Entity
+public class Drug {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @NotBlank(message = "鑽搧鍚嶇О涓嶈兘涓虹┖")
+    private String name;
+    
+    @NotBlank(message = "鑽搧瑙勬牸涓嶈兘涓虹┖")
+    private String spec;
+    
+    @NotNull(message = "搴撳瓨涓嶈兘涓虹┖")
+    @Min(value = 0, message = "搴撳瓨涓嶈兘涓鸿礋鏁?)
+    private Integer stock;
+    
+    @NotNull(message = "鏈夋晥鏈熶笉鑳戒负绌?)
+    private LocalDate expirationDate;
+    
+    private String supplier;
+    private String category; // 鑽搧绫诲埆锛屽锛氭姉鐢熺礌銆佽В鐑晣鐥涖€佺淮鐢熺礌绛?
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getSpec() {
+        return spec;
+    }
+
+    public void setSpec(String spec) {
+        this.spec = spec;
+    }
+
+    public Integer getStock() {
+        return stock;
+    }
+
+    public void setStock(Integer stock) {
+        this.stock = stock;
+    }
+
+    public LocalDate getExpirationDate() {
+        return expirationDate;
+    }
+
+    public void setExpirationDate(LocalDate expirationDate) {
+        this.expirationDate = expirationDate;
+    }
+
+    public String getSupplier() {
+        return supplier;
+    }
+
+    public void setSupplier(String supplier) {
+        this.supplier = supplier;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+} 
+
+==== src\main\java\com\example\hospital\model\OperationLog.java ====
+package com.example.hospital.model;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import java.time.LocalDateTime;
+
+@Entity
+public class OperationLog {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private String username;
+    private String action;
+    private Long drugId;
+    private String drugName;
+    private LocalDateTime timestamp;
+    private String details;
+    
+    // 鏋勯€犲嚱鏁?
+    public OperationLog() {
+    }
+    
+    public OperationLog(String username, String action, Long drugId, String drugName, String details) {
+        this.username = username;
+        this.action = action;
+        this.drugId = drugId;
+        this.drugName = drugName;
+        this.details = details;
+        this.timestamp = LocalDateTime.now();
+    }
+    
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
+    }
+    
+    public String getUsername() {
+        return username;
+    }
+    
+    public void setUsername(String username) {
+        this.username = username;
+    }
+    
+    public String getAction() {
+        return action;
+    }
+    
+    public void setAction(String action) {
+        this.action = action;
+    }
+    
+    public Long getDrugId() {
+        return drugId;
+    }
+    
+    public void setDrugId(Long drugId) {
+        this.drugId = drugId;
+    }
+    
+    public String getDrugName() {
+        return drugName;
+    }
+    
+    public void setDrugName(String drugName) {
+        this.drugName = drugName;
+    }
+    
+    public LocalDateTime getTimestamp() {
+        return timestamp;
+    }
+    
+    public void setTimestamp(LocalDateTime timestamp) {
+        this.timestamp = timestamp;
+    }
+    
+    public String getDetails() {
+        return details;
+    }
+    
+    public void setDetails(String details) {
+        this.details = details;
+    }
+} 
+
+==== src\main\java\com\example\hospital\model\StockHistory.java ====
+package com.example.hospital.model;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import java.time.LocalDate;
+
+@Entity
+public class StockHistory {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    private LocalDate date;
+    private Integer totalStock;
+    
+    // 鏋勯€犲嚱鏁?
+    public StockHistory() {
+    }
+    
+    public StockHistory(LocalDate date, Integer totalStock) {
+        this.date = date;
+        this.totalStock = totalStock;
+    }
+    
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
+    }
+    
+    public LocalDate getDate() {
+        return date;
+    }
+    
+    public void setDate(LocalDate date) {
+        this.date = date;
+    }
+    
+    public Integer getTotalStock() {
+        return totalStock;
+    }
+    
+    public void setTotalStock(Integer totalStock) {
+        this.totalStock = totalStock;
+    }
+} 
+
+==== src\main\java\com\example\hospital\model\SystemSetting.java ====
+package com.example.hospital.model;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+@Entity
+@Table(name = "system_settings")
+public class SystemSetting {
+    
+    @Id
+    @Column(name = "setting_key", nullable = false, length = 100)
+    private String settingKey;
+    
+    @Column(name = "setting_value", nullable = false, length = 500)
+    private String settingValue;
+    
+    @Column(name = "description", length = 255)
+    private String description;
+    
+    // 鏋勯€犲嚱鏁?
+    public SystemSetting() {
+    }
+    
+    public SystemSetting(String settingKey, String settingValue, String description) {
+        this.settingKey = settingKey;
+        this.settingValue = settingValue;
+        this.description = description;
+    }
+    
+    // Getters and Setters
+    public String getSettingKey() {
+        return settingKey;
+    }
+    
+    public void setSettingKey(String settingKey) {
+        this.settingKey = settingKey;
+    }
+    
+    public String getSettingValue() {
+        return settingValue;
+    }
+    
+    public void setSettingValue(String settingValue) {
+        this.settingValue = settingValue;
+    }
+    
+    public String getDescription() {
+        return description;
+    }
+    
+    public void setDescription(String description) {
+        this.description = description;
+    }
+    
+    @Override
+    public String toString() {
+        return "SystemSetting{" +
+                "settingKey='" + settingKey + '\'' +
+                ", settingValue='" + settingValue + '\'' +
+                ", description='" + description + '\'' +
+                '}';
+    }
+} 
+
+==== src\main\java\com\example\hospital\model\User.java ====
+package com.example.hospital.model;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+@Entity
+@Table(name = "users")
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String username;
+    private String password;
+    private String role;
+
+    // Getters and Setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+    
+    @Override
+    public String toString() {
+        return "User{" +
+                "id=" + id +
+                ", username='" + username + '\'' +
+                ", role='" + role + '\'' +
+                '}';
+    }
+} 
+
+==== src\main\java\com\example\hospital\repository\DrugRepository.java ====
+package com.example.hospital.repository;
+
+import com.example.hospital.model.Drug;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+
+@Repository
+public interface DrugRepository extends JpaRepository<Drug, Long> {
+    Drug findByName(String name);
+    
+    /**
+     * 鏍规嵁鑽搧鍚嶇О杩涜妯＄硦鏌ヨ
+     * @param keyword 鎼滅储鍏抽敭璇?
+     * @return 鍖归厤鐨勮嵂鍝佸垪琛?
+     */
+    @Query("SELECT d FROM Drug d WHERE LOWER(d.name) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    List<Drug> findByNameContainingIgnoreCase(@Param("keyword") String keyword);
+    
+    /**
+     * 鏌ヨ搴撳瓨浣庝簬鎸囧畾闃堝€肩殑鑽搧
+     * @param threshold 搴撳瓨闃堝€?
+     * @return 搴撳瓨浣庝簬闃堝€肩殑鑽搧鍒楄〃
+     */
+    @Query("SELECT d FROM Drug d WHERE d.stock < :threshold ORDER BY d.stock ASC")
+    List<Drug> findByStockLessThan(@Param("threshold") Integer threshold);
+    
+    /**
+     * 缁熻姣忎釜绫诲埆鐨勮嵂鍝佹暟閲?
+     * @return 姣忎釜绫诲埆鍙婂叾瀵瑰簲鐨勮嵂鍝佹暟閲?
+     */
+    @Query("SELECT d.category as category, COUNT(d) as count FROM Drug d GROUP BY d.category")
+    List<Object[]> countByCategory();
+    
+    // 鏌ユ壘鎸囧畾澶╂暟鍐呭嵆灏嗚繃鏈熺殑鑽搧
+    @Query("SELECT d FROM Drug d WHERE d.expirationDate <= :endDate ORDER BY d.expirationDate ASC")
+    List<Drug> findExpiringDrugs(@Param("endDate") LocalDate endDate);
+} 
+
+==== src\main\java\com\example\hospital\repository\OperationLogRepository.java ====
+package com.example.hospital.repository;
+
+import com.example.hospital.model.OperationLog;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface OperationLogRepository extends JpaRepository<OperationLog, Long> {
+    
+    // 鎸夋搷浣滄椂闂撮檷搴忔煡鎵炬搷浣滄棩蹇?
+    @Query("SELECT l FROM OperationLog l ORDER BY l.timestamp DESC")
+    List<OperationLog> findAllOrderByTimestampDesc();
+    
+    // 鏌ユ壘鐗瑰畾鐢ㄦ埛鐨勬搷浣滄棩蹇?
+    List<OperationLog> findByUsernameOrderByTimestampDesc(String username);
+    
+    // 鏌ユ壘鐗瑰畾鑽搧鐨勬搷浣滄棩蹇?
+    List<OperationLog> findByDrugIdOrderByTimestampDesc(Long drugId);
+} 
+
+==== src\main\java\com\example\hospital\repository\StockHistoryRepository.java ====
+package com.example.hospital.repository;
+
+import com.example.hospital.model.StockHistory;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.util.List;
+
+@Repository
+public interface StockHistoryRepository extends JpaRepository<StockHistory, Long> {
+    
+    // 鏌ユ壘鎸囧畾鏃ユ湡鑼冨洿鍐呯殑搴撳瓨鍘嗗彶
+    @Query("SELECT sh FROM StockHistory sh WHERE sh.date >= :startDate ORDER BY sh.date ASC")
+    List<StockHistory> findStockHistoryInRange(@Param("startDate") LocalDate startDate);
+    
+    // 鏌ユ壘鎸囧畾鏃ユ湡鐨勫簱瀛樺巻鍙?
+    StockHistory findByDate(LocalDate date);
+} 
+
+==== src\main\java\com\example\hospital\repository\SystemSettingRepository.java ====
+package com.example.hospital.repository;
+
+import com.example.hospital.model.SystemSetting;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface SystemSettingRepository extends JpaRepository<SystemSetting, Long> {
+    
+    /**
+     * 鏍规嵁閿煡鎵捐缃?
+     * 
+     * @param settingKey 璁剧疆閿?
+     * @return 绯荤粺璁剧疆
+     */
+    SystemSetting findBySettingKey(String settingKey);
+    
+    /**
+     * 鏌ユ壘浠ユ寚瀹氬墠缂€寮€澶寸殑鎵€鏈夎缃?
+     * 
+     * @param prefix 鍓嶇紑
+     * @return 绗﹀悎鏉′欢鐨勮缃垪琛?
+     */
+    List<SystemSetting> findBySettingKeyStartingWithOrderBySettingKey(String prefix);
+    
+    /**
+     * 鎸夐敭鎺掑簭鑾峰彇鎵€鏈夎缃?
+     * 
+     * @return 鎸夐敭鎺掑簭鐨勮缃垪琛?
+     */
+    List<SystemSetting> findAllByOrderBySettingKey();
+    
+    /**
+     * 鎸夐敭鍗囧簭鎺掑簭鑾峰彇鎵€鏈夎缃?
+     * 
+     * @return 鎸夐敭鍗囧簭鎺掑簭鐨勮缃垪琛?
+     */
+    List<SystemSetting> findAllByOrderBySettingKeyAsc();
+    
+    /**
+     * 鍒犻櫎鎸囧畾閿殑璁剧疆
+     * 
+     * @param settingKey
+     */
+    void deleteBySettingKey(String settingKey);
+} 
+
+==== src\main\java\com\example\hospital\repository\UserRepository.java ====
+package com.example.hospital.repository;
+
+import com.example.hospital.model.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Long> {
+    User findByUsername(String username);
+} 
+
+==== src\main\java\com\example\hospital\security\JwtRequestFilter.java ====
+package com.example.hospital.security;
+
+import com.example.hospital.util.JwtUtil;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+@Component
+public class JwtRequestFilter extends OncePerRequestFilter {
+
+    @Autowired
+    private UserDetailsService userDetailsService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
+
+        final String authorizationHeader = request.getHeader("Authorization");
+
+        String username = null;
+        String jwt = null;
+
+        // 妫€鏌ヨ姹傚ご涓槸鍚﹀寘鍚獼WT锛屼笖鏍煎紡涓?Bearer token"
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+            jwt = authorizationHeader.substring(7);
+            try {
+                username = jwtUtil.extractUsername(jwt);
+            } catch (Exception e) {
+                logger.error("JWT浠ょ墝鏃犳晥: " + e.getMessage());
+            }
+        }
+
+        // 濡傛灉浠嶫WT涓彁鍙栧埌鐢ㄦ埛鍚嶏紝涓斿綋鍓峉ecurityContext涓病鏈夎璇佷俊鎭?
+        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+
+            // 楠岃瘉JWT鏈夋晥
+            if (jwtUtil.validateToken(jwt, userDetails)) {
+                UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                
+                // 鏇存柊SecurityContext涓殑璁よ瘉淇℃伅
+                SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+            }
+        }
+        chain.doFilter(request, response);
+    }
+} 
+
+==== src\main\java\com\example\hospital\service\OperationLogService.java ====
+package com.example.hospital.service;
+
+import com.example.hospital.model.Drug;
+import com.example.hospital.model.OperationLog;
+import com.example.hospital.repository.OperationLogRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class OperationLogService {
+
+    @Autowired
+    private OperationLogRepository operationLogRepository;
+    
+    /**
+     * 鑾峰彇鎵€鏈夋搷浣滄棩蹇楋紝鎸夋椂闂撮檷搴忔帓鍒?
+     */
+    public List<OperationLog> findAllLogs() {
+        return operationLogRepository.findAllOrderByTimestampDesc();
+    }
+    
+    /**
+     * 鑾峰彇鎸囧畾鐢ㄦ埛鐨勬搷浣滄棩蹇?
+     */
+    public List<OperationLog> findLogsByUsername(String username) {
+        return operationLogRepository.findByUsernameOrderByTimestampDesc(username);
+    }
+    
+    /**
+     * 鑾峰彇鎸囧畾鑽搧鐨勬搷浣滄棩蹇?
+     */
+    public List<OperationLog> findLogsByDrugId(Long drugId) {
+        return operationLogRepository.findByDrugIdOrderByTimestampDesc(drugId);
+    }
+    
+    /**
+     * 璁板綍涓€鑸搷浣?
+     * @param username 鐢ㄦ埛鍚?
+     * @param action 鎿嶄綔绫诲瀷
+     * @param details 鎿嶄綔璇︽儏
+     */
+    public void logOperation(String username, String action, String details) {
+        OperationLog log = new OperationLog(username, action, null, "绯荤粺璁剧疆", details);
+        operationLogRepository.save(log);
+    }
+    
+    /**
+     * 璁板綍娣诲姞鑽搧鎿嶄綔
+     */
+    public void logAddDrug(Drug drug) {
+        String username = getCurrentUsername();
+        String details = String.format("娣诲姞鑽搧锛屽簱瀛橈細%d", drug.getStock());
+        OperationLog log = new OperationLog(username, "ADD", drug.getId(), drug.getName(), details);
+        operationLogRepository.save(log);
+    }
+    
+    /**
+     * 璁板綍鏇存柊鑽搧鎿嶄綔
+     */
+    public void logUpdateDrug(Drug oldDrug, Drug newDrug) {
+        String username = getCurrentUsername();
+        StringBuilder details = new StringBuilder("鏇存柊鑽搧淇℃伅锛?);
+        
+        if (!oldDrug.getName().equals(newDrug.getName())) {
+            details.append("鍚嶇О鐢?").append(oldDrug.getName())
+                   .append(" 鏀逛负 ").append(newDrug.getName()).append("锛?);
+        }
+        
+        if (!oldDrug.getSpec().equals(newDrug.getSpec())) {
+            details.append("瑙勬牸鐢?").append(oldDrug.getSpec())
+                   .append(" 鏀逛负 ").append(newDrug.getSpec()).append("锛?);
+        }
+        
+        if (!oldDrug.getStock().equals(newDrug.getStock())) {
+            details.append("搴撳瓨鐢?").append(oldDrug.getStock())
+                   .append(" 鏀逛负 ").append(newDrug.getStock()).append("锛?);
+        }
+        
+        OperationLog log = new OperationLog(username, "UPDATE", newDrug.getId(), newDrug.getName(), details.toString());
+        operationLogRepository.save(log);
+    }
+    
+    /**
+     * 璁板綍鍒犻櫎鑽搧鎿嶄綔
+     */
+    public void logDeleteDrug(Drug drug) {
+        String username = getCurrentUsername();
+        String details = String.format("鍒犻櫎鑽搧锛屽簱瀛橈細%d", drug.getStock());
+        OperationLog log = new OperationLog(username, "DELETE", drug.getId(), drug.getName(), details);
+        operationLogRepository.save(log);
+    }
+    
+    /**
+     * 璁板綍鎵归噺鍒犻櫎鑽搧鎿嶄綔
+     */
+    public void logBatchDeleteDrugs(List<Drug> drugs) {
+        String username = getCurrentUsername();
+        String details = String.format("鎵归噺鍒犻櫎%d绉嶈嵂鍝?, drugs.size());
+        
+        OperationLog log = new OperationLog(username, "BATCH_DELETE", null, "澶氫釜鑽搧", details);
+        operationLogRepository.save(log);
+    }
+    
+    /**
+     * 鑾峰彇褰撳墠鐧诲綍鐢ㄦ埛鍚?
+     */
+    private String getCurrentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null ? authentication.getName() : "system";
+    }
+} 
+
+==== src\main\java\com\example\hospital\service\StockHistoryService.java ====
+package com.example.hospital.service;
+
+import com.example.hospital.model.Drug;
+import com.example.hospital.model.StockHistory;
+import com.example.hospital.repository.DrugRepository;
+import com.example.hospital.repository.StockHistoryRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.List;
+
+@Service
+public class StockHistoryService {
+
+    @Autowired
+    private DrugRepository drugRepository;
+    
+    @Autowired
+    private StockHistoryRepository stockHistoryRepository;
+    
+    /**
+     * 姣忓ぉ鍗堝璁板綍褰撳ぉ鐨勫簱瀛樻€婚噺
+     */
+    @Scheduled(cron = "0 0 0 * * ?") // 姣忓ぉ鍗堝杩愯
+    @Transactional
+    public void recordDailyStockSnapshot() {
+        // 鑾峰彇鎵€鏈夎嵂鍝?
+        List<Drug> allDrugs = drugRepository.findAll();
+        
+        // 璁＄畻褰撳墠鎬诲簱瀛?
+        int totalStock = allDrugs.stream()
+                .mapToInt(drug -> drug.getStock() != null ? drug.getStock() : 0)
+                .sum();
+        
+        // 鑾峰彇浠婂ぉ鐨勬棩鏈?
+        LocalDate today = LocalDate.now();
+        
+        // 妫€鏌ユ槸鍚﹀凡缁忔湁浠婂ぉ鐨勮褰?
+        StockHistory existingRecord = stockHistoryRepository.findByDate(today);
+        
+        if (existingRecord != null) {
+            // 鏇存柊鐜版湁璁板綍
+            existingRecord.setTotalStock(totalStock);
+            stockHistoryRepository.save(existingRecord);
+        } else {
+            // 鍒涘缓鏂拌褰?
+            StockHistory newRecord = new StockHistory(today, totalStock);
+            stockHistoryRepository.save(newRecord);
+        }
+    }
+    
+    /**
+     * 鍦ㄥ簲鐢ㄥ惎鍔ㄦ椂璁板綍褰撳ぉ鐨勫簱瀛樻€婚噺
+     */
+    @Transactional
+    public void recordStockSnapshotOnStartup() {
+        // 鑾峰彇鎵€鏈夎嵂鍝?
+        List<Drug> allDrugs = drugRepository.findAll();
+        
+        // 璁＄畻褰撳墠鎬诲簱瀛?
+        int totalStock = allDrugs.stream()
+                .mapToInt(drug -> drug.getStock() != null ? drug.getStock() : 0)
+                .sum();
+        
+        // 鑾峰彇浠婂ぉ鐨勬棩鏈?
+        LocalDate today = LocalDate.now();
+        
+        // 妫€鏌ユ槸鍚﹀凡缁忔湁浠婂ぉ鐨勮褰?
+        StockHistory existingRecord = stockHistoryRepository.findByDate(today);
+        
+        if (existingRecord != null) {
+            // 鏇存柊鐜版湁璁板綍
+            existingRecord.setTotalStock(totalStock);
+            stockHistoryRepository.save(existingRecord);
+        } else {
+            // 鍒涘缓鏂拌褰?
+            StockHistory newRecord = new StockHistory(today, totalStock);
+            stockHistoryRepository.save(newRecord);
+        }
+        
+        // 濡傛灉涓嶅瓨鍦ㄨ繃鍘?0澶╃殑璁板綍锛屽垱寤烘ā鎷熸暟鎹?
+        createMockHistoryIfNeeded();
+    }
+    
+    /**
+     * 鍒涘缓妯℃嫙鍘嗗彶鏁版嵁锛堝鏋滈渶瑕侊級
+     */
+    private void createMockHistoryIfNeeded() {
+        LocalDate startDate = LocalDate.now().minusDays(30);
+        List<StockHistory> history = stockHistoryRepository.findStockHistoryInRange(startDate);
+        
+        // 濡傛灉涓嶅瓨鍦ㄥ巻鍙叉暟鎹紝鍒涘缓妯℃嫙鏁版嵁
+        if (history.isEmpty()) {
+            int baseStock = 1000; // 鍩虹搴撳瓨閲?
+            
+            for (int i = 30; i > 0; i--) {
+                LocalDate date = LocalDate.now().minusDays(i);
+                // 闅忔満娉㈠姩锛屽垱寤烘洿鐪熷疄鐨勬暟鎹?
+                int randomVariation = (int) (Math.random() * 100) - 50; // -50 鍒?50 涔嬮棿鐨勯殢鏈烘暟
+                int dailyStock = baseStock + randomVariation;
+                
+                StockHistory mockRecord = new StockHistory(date, dailyStock);
+                stockHistoryRepository.save(mockRecord);
+                
+                // 鏇存柊鍩虹搴撳瓨锛屼骇鐢熻秼鍔?
+                baseStock += (int) (Math.random() * 20) - 5; // -5 鍒?15 涔嬮棿鐨勯殢鏈烘暟
+            }
+        }
+    }
+} 
+
+==== src\main\java\com\example\hospital\service\SystemSettingService.java ====
+package com.example.hospital.service;
+
+import com.example.hospital.model.SystemSetting;
+import com.example.hospital.repository.SystemSettingRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+@Service
+public class SystemSettingService {
+
+    @Autowired
+    private SystemSettingRepository systemSettingRepository;
+
+    public List<SystemSetting> getAllSettings() {
+        return systemSettingRepository.findAllByOrderBySettingKeyAsc();
+    }
+
+    public SystemSetting getSetting(String key) {
+        return systemSettingRepository.findBySettingKey(key);
+    }
+
+    public String getSettingValue(String key, String defaultValue) {
+        SystemSetting setting = systemSettingRepository.findBySettingKey(key);
+        return setting != null ? setting.getSettingValue() : defaultValue;
+    }
+
+    public SystemSetting saveSetting(SystemSetting setting) {
+        return systemSettingRepository.save(setting);
+    }
+
+    public void deleteSetting(String key) {
+        systemSettingRepository.deleteBySettingKey(key);
+    }
+
+    public List<SystemSetting> getSettingsByPrefix(String prefix) {
+        return systemSettingRepository.findBySettingKeyStartingWithOrderBySettingKey(prefix);
+    }
+
+    public String getValue(String key) {
+        return getSettingValue(key, null);
+    }
+
+    public SystemSetting saveSetting(String key, String value, String description) {
+        SystemSetting setting = new SystemSetting();
+        setting.setSettingKey(key);
+        setting.setSettingValue(value);
+        setting.setDescription(description);
+        return saveSetting(setting);
+    }
+
+    public Map<String, String> getSettingsAsMap() {
+        List<SystemSetting> settings = getAllSettings();
+        Map<String, String> map = settings.stream()
+            .collect(Collectors.toMap(
+                SystemSetting::getSettingKey,
+                SystemSetting::getSettingValue
+            ));
+        return map;
+    }
+
+    public Map<String, String> getSettingsAsMap(String prefix) {
+        List<SystemSetting> settings = getSettingsByPrefix(prefix);
+        Map<String, String> map = settings.stream()
+            .collect(Collectors.toMap(
+                SystemSetting::getSettingKey,
+                SystemSetting::getSettingValue
+            ));
+        return map;
+    }
+} 
+
+==== src\main\java\com\example\hospital\service\UserService.java ====
+package com.example.hospital.service;
+
+import com.example.hospital.model.User;
+import com.example.hospital.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    
+    @Autowired
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+    
+    /**
+     * 鏍规嵁鐢ㄦ埛鍚嶆煡鎵剧敤鎴?
+     * @param username 鐢ㄦ埛鍚?
+     * @return 鎵惧埌鐨勭敤鎴凤紝濡傛灉涓嶅瓨鍦ㄥ垯杩斿洖null
+     */
+    public User findByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+    
+    /**
+     * 楠岃瘉鐢ㄦ埛瀵嗙爜鏄惁姝ｇ‘
+     * @param username 鐢ㄦ埛鍚?
+     * @param password 瀵嗙爜
+     * @return 濡傛灉楠岃瘉鎴愬姛杩斿洖鐢ㄦ埛瀵硅薄锛屽惁鍒欒繑鍥瀗ull
+     */
+    public User authenticate(String username, String password) {
+        User user = findByUsername(username);
+        System.out.println("楠岃瘉鐢ㄦ埛: " + username);
+        System.out.println("鎵惧埌鐢ㄦ埛: " + (user != null ? user.toString() : "null"));
+        
+        if (user != null) {
+            boolean matches = passwordEncoder.matches(password, user.getPassword());
+            System.out.println("瀵嗙爜鍖归厤缁撴灉: " + matches);
+            System.out.println("鏁版嵁搴撳瘑鐮侀暱搴? " + user.getPassword().length());
+            if (matches) {
+                return user;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * 妫€鏌ョ敤鎴锋槸鍚︽湁绠＄悊鍛樻潈闄?
+     * @param username 鐢ㄦ埛鍚?
+     * @return 濡傛灉鏄鐞嗗憳杩斿洖true锛屽惁鍒欒繑鍥瀎alse
+     */
+    public boolean isAdmin(String username) {
+        User user = findByUsername(username);
+        return user != null && "ADMIN".equals(user.getRole());
+    }
+    
+    /**
+     * 妫€鏌ョ敤鎴峰悕鏄惁宸插瓨鍦?
+     * @param username 鐢ㄦ埛鍚?
+     * @return 濡傛灉瀛樺湪杩斿洖true锛屽惁鍒欒繑鍥瀎alse
+     */
+    public boolean userExists(String username) {
+        return findByUsername(username) != null;
+    }
+    
+    /**
+     * 鏍规嵁ID鏌ユ壘鐢ㄦ埛
+     * @param id 鐢ㄦ埛ID
+     * @return 鎵惧埌鐨勭敤鎴凤紝濡傛灉涓嶅瓨鍦ㄥ垯杩斿洖null
+     */
+    public User findById(Long id) {
+        return userRepository.findById(id).orElse(null);
+    }
+    
+    /**
+     * 鑾峰彇鎵€鏈夌敤鎴?
+     * @return 鐢ㄦ埛鍒楄〃
+     */
+    public List<User> findAllUsers() {
+        return userRepository.findAll();
+    }
+    
+    /**
+     * 鍒涘缓鏂扮敤鎴?
+     * @param username 鐢ㄦ埛鍚?
+     * @param password 瀵嗙爜
+     * @param role 瑙掕壊
+     * @return 淇濆瓨鍚庣殑鐢ㄦ埛瀵硅薄
+     */
+    @Transactional
+    public User createUser(String username, String password, String role) {
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword(password);
+        user.setRole(role);
+        return createUser(user);
+    }
+    
+    /**
+     * 鍒涘缓鏂扮敤鎴?
+     * @param user 鐢ㄦ埛瀵硅薄
+     * @return 淇濆瓨鍚庣殑鐢ㄦ埛瀵硅薄
+     */
+    @Transactional
+    public User createUser(User user) {
+        // 鍔犲瘑瀵嗙爜
+        String encodedPassword = passwordEncoder.encode(user.getPassword());
+        System.out.println("鍒涘缓鐢ㄦ埛: " + user.getUsername());
+        System.out.println("鍘熷瀵嗙爜闀垮害: " + user.getPassword().length());
+        System.out.println("鍔犲瘑瀵嗙爜闀垮害: " + encodedPassword.length());
+        
+        user.setPassword(encodedPassword);
+        
+        // 璁剧疆榛樿瑙掕壊
+        if (user.getRole() == null || user.getRole().isEmpty()) {
+            user.setRole("USER");
+        }
+        
+        return userRepository.save(user);
+    }
+    
+    /**
+     * 鏇存柊鐢ㄦ埛瑙掕壊
+     * @param id 鐢ㄦ埛ID
+     * @param role 瑙掕壊
+     * @return 鏇存柊鍚庣殑鐢ㄦ埛瀵硅薄
+     */
+    @Transactional
+    public User updateUserRole(Long id, String role) {
+        User user = findById(id);
+        if (user == null) {
+            throw new RuntimeException("鐢ㄦ埛涓嶅瓨鍦?);
+        }
+        
+        user.setRole(role);
+        return userRepository.save(user);
+    }
+    
+    /**
+     * 鍒犻櫎鐢ㄦ埛
+     * @param id 鐢ㄦ埛ID
+     */
+    @Transactional
+    public void deleteUser(Long id) {
+        User user = findById(id);
+        if (user == null) {
+            throw new RuntimeException("鐢ㄦ埛涓嶅瓨鍦?);
+        }
+        
+        userRepository.deleteById(id);
+    }
+} 
+
+==== src\main\java\com\example\hospital\util\JwtUtil.java ====
+package com.example.hospital.util;
+
+import com.example.hospital.model.User;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Component;
+
+import javax.crypto.SecretKey;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
+
+@Component
+public class JwtUtil {
+
+    private final SecretKey key = Keys.secretKeyFor(SignatureAlgorithm.HS512);
+    
+    @Value("${jwt.expiration:86400000}") // 榛樿24灏忔椂杩囨湡
+    private long jwtExpiration;
+
+    // 浠嶫WT涓彁鍙栫敤鎴峰悕
+    public String extractUsername(String token) {
+        return extractClaim(token, Claims::getSubject);
+    }
+
+    // 浠嶫WT涓彁鍙栬繃鏈熸椂闂?
+    public Date extractExpiration(String token) {
+        return extractClaim(token, Claims::getExpiration);
+    }
+
+    // 浠嶫WT涓彁鍙栨寚瀹氭暟鎹?
+    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = extractAllClaims(token);
+        return claimsResolver.apply(claims);
+    }
+
+    // 瑙ｆ瀽JWT鑾峰彇鎵€鏈夊０鏄?
+    private Claims extractAllClaims(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+
+    // 妫€鏌WT鏄惁宸茶繃鏈?
+    private Boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+
+    // 涓虹敤鎴风敓鎴怞WT
+    public String generateToken(User user) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("id", user.getId());
+        claims.put("role", user.getRole());
+        return createToken(claims, user.getUsername());
+    }
+
+    // 鍒涘缓JWT
+    private String createToken(Map<String, Object> claims, String subject) {
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(subject)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .signWith(key, SignatureAlgorithm.HS512)
+                .compact();
+    }
+
+    // 楠岃瘉JWT
+    public Boolean validateToken(String token, UserDetails userDetails) {
+        final String username = extractUsername(token);
+        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+    }
+} 
+
+==== src\test\java\com\example\hospital\UserServiceTest.java ====
+package com.example.hospital;
+
+import com.example.hospital.model.User;
+import com.example.hospital.repository.UserRepository;
+import com.example.hospital.service.UserService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest
+@Transactional
+public class UserServiceTest {
+
+    @Autowired
+    private UserService userService;
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    
+    @Test
+    public void testCreateUser() {
+        // 鍒涘缓娴嬭瘯鐢ㄦ埛
+        User testUser = new User();
+        testUser.setUsername("testuser");
+        testUser.setPassword("password123");
+        
+        User savedUser = userService.createUser(testUser);
+        
+        // 楠岃瘉鐢ㄦ埛宸蹭繚瀛?
+        assertNotNull(savedUser.getId());
+        assertEquals("testuser", savedUser.getUsername());
+        assertEquals("USER", savedUser.getRole()); // 榛樿瑙掕壊
+        assertTrue(passwordEncoder.matches("password123", savedUser.getPassword())); // 楠岃瘉瀵嗙爜琚姞瀵?
+    }
+    
+    @Test
+    public void testAuthenticate() {
+        // 鍒涘缓娴嬭瘯鐢ㄦ埛
+        User testUser = new User();
+        testUser.setUsername("authuser");
+        testUser.setPassword("password123");
+        
+        userService.createUser(testUser);
+        
+        // 娴嬭瘯姝ｇ‘瀵嗙爜
+        User authenticatedUser = userService.authenticate("authuser", "password123");
+        assertNotNull(authenticatedUser);
+        assertEquals("authuser", authenticatedUser.getUsername());
+        
+        // 娴嬭瘯閿欒瀵嗙爜
+        User failedAuth = userService.authenticate("authuser", "wrongpassword");
+        assertNull(failedAuth);
+        
+        // 娴嬭瘯涓嶅瓨鍦ㄧ殑鐢ㄦ埛
+        User nonExistentUser = userService.authenticate("nonexistent", "anypassword");
+        assertNull(nonExistentUser);
+    }
+    
+    @Test
+    public void testFindByUsername() {
+        // 鍒涘缓娴嬭瘯鐢ㄦ埛
+        User testUser = new User();
+        testUser.setUsername("finduser");
+        testUser.setPassword("password123");
+        
+        userService.createUser(testUser);
+        
+        // 娴嬭瘯鏌ユ壘瀛樺湪鐨勭敤鎴?
+        User foundUser = userService.findByUsername("finduser");
+        assertNotNull(foundUser);
+        assertEquals("finduser", foundUser.getUsername());
+        
+        // 娴嬭瘯鏌ユ壘涓嶅瓨鍦ㄧ殑鐢ㄦ埛
+        User notFoundUser = userService.findByUsername("nonexistent");
+        assertNull(notFoundUser);
+    }
+    
+    @Test
+    public void testIsAdmin() {
+        // 鍒涘缓绠＄悊鍛樼敤鎴?
+        User adminUser = new User();
+        adminUser.setUsername("adminuser");
+        adminUser.setPassword("password123");
+        adminUser.setRole("ADMIN");
+        
+        userService.createUser(adminUser);
+        
+        // 鍒涘缓鏅€氱敤鎴?
+        User normalUser = new User();
+        normalUser.setUsername("normaluser");
+        normalUser.setPassword("password123");
+        normalUser.setRole("USER");
+        
+        userService.createUser(normalUser);
+        
+        // 娴嬭瘯绠＄悊鍛樼敤鎴?
+        assertTrue(userService.isAdmin("adminuser"));
+        
+        // 娴嬭瘯鏅€氱敤鎴?
+        assertFalse(userService.isAdmin("normaluser"));
+        
+        // 娴嬭瘯涓嶅瓨鍦ㄧ殑鐢ㄦ埛
+        assertFalse(userService.isAdmin("nonexistent"));
+    }
+} 
+

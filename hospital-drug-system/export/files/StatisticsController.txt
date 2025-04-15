@@ -1,0 +1,65 @@
+﻿==========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\controller\StatisticsController.java
+==========================================================================
+
+package com.example.hospital.controller;
+
+import com.example.hospital.repository.DrugRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 统计数据控制器，提供各类数据统计接口
+ */
+@RestController
+@RequestMapping("/api/stats")
+public class StatisticsController {
+
+    @Autowired
+    private DrugRepository drugRepository;
+
+    /**
+     * 统计各类药品数量
+     * @return 各类药品数量统计
+     */
+    @GetMapping("/category")
+    public ResponseEntity<?> getDrugCategoryStats() {
+        List<Object[]> categoryResults = drugRepository.countByCategory();
+        
+        // 将结果转换为前端友好的格式
+        List<Map<String, Object>> categories = new ArrayList<>();
+        int totalDrugs = 0;
+        
+        for (Object[] result : categoryResults) {
+            String category = (String) result[0];
+            Long count = (Long) result[1];
+            totalDrugs += count;
+            
+            // 如果类别为null，替换为"未分类"
+            if (category == null || category.trim().isEmpty()) {
+                category = "未分类";
+            }
+            
+            Map<String, Object> categoryData = new HashMap<>();
+            categoryData.put("name", category);
+            categoryData.put("count", count);
+            categories.add(categoryData);
+        }
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "共统计" + totalDrugs + "种药品，涵盖" + categories.size() + "个类别");
+        response.put("categories", categories);
+        response.put("total", totalDrugs);
+        
+        return ResponseEntity.ok(response);
+    }
+} 

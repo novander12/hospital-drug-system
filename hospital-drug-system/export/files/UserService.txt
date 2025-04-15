@@ -1,0 +1,89 @@
+﻿==========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\java\com\example\hospital\service\UserService.java
+==========================================================================
+
+package com.example.hospital.service;
+
+import com.example.hospital.model.User;
+import com.example.hospital.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    
+    @Autowired
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+    
+    /**
+     * 根据用户名查找用户
+     * @param username 用户名
+     * @return 找到的用户，如果不存在则返回null
+     */
+    public User findByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+    
+    /**
+     * 验证用户密码是否正确
+     * @param username 用户名
+     * @param password 密码
+     * @return 如果验证成功返回用户对象，否则返回null
+     */
+    public User authenticate(String username, String password) {
+        User user = findByUsername(username);
+        System.out.println("验证用户: " + username);
+        System.out.println("找到用户: " + (user != null ? user.toString() : "null"));
+        
+        if (user != null) {
+            boolean matches = passwordEncoder.matches(password, user.getPassword());
+            System.out.println("密码匹配结果: " + matches);
+            System.out.println("数据库密码长度: " + user.getPassword().length());
+            if (matches) {
+                return user;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * 检查用户是否有管理员权限
+     * @param username 用户名
+     * @return 如果是管理员返回true，否则返回false
+     */
+    public boolean isAdmin(String username) {
+        User user = findByUsername(username);
+        return user != null && "ADMIN".equals(user.getRole());
+    }
+    
+    /**
+     * 创建新用户
+     * @param user 用户对象
+     * @return 保存后的用户对象
+     */
+    @Transactional
+    public User createUser(User user) {
+        // 加密密码
+        String encodedPassword = passwordEncoder.encode(user.getPassword());
+        System.out.println("创建用户: " + user.getUsername());
+        System.out.println("原始密码长度: " + user.getPassword().length());
+        System.out.println("加密密码长度: " + encodedPassword.length());
+        
+        user.setPassword(encodedPassword);
+        
+        // 设置默认角色
+        if (user.getRole() == null || user.getRole().isEmpty()) {
+            user.setRole("USER");
+        }
+        
+        return userRepository.save(user);
+    }
+} 

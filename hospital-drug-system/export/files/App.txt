@@ -1,0 +1,187 @@
+﻿==========================================================================
+鏂囦欢璺緞: C:\Users\15291\Desktop\hospital-drug-system\src\main\resources\static\js\App.vue
+==========================================================================
+
+<template>
+  <div class="app-container">
+    <!-- 未登录时显示登录页面 -->
+    <login-page
+      v-if="!isLoggedIn"
+      @login-success="handleLoginSuccess"
+    />
+    
+    <!-- 登录后显示主页面 -->
+    <el-container v-else class="main-container">
+      <!-- 顶部导航栏 -->
+      <el-header class="app-header">
+        <div class="header-title">医院药品管理系统</div>
+        <div class="user-info">
+          <span>{{ userInfo.username }}</span>
+          <el-dropdown trigger="click" @command="handleCommand">
+            <el-avatar :size="32" :icon="UserFilled" />
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="profile">个人信息</el-dropdown-item>
+                <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </el-header>
+      
+      <!-- 内容区域 -->
+      <el-container>
+        <!-- 侧边菜单 -->
+        <el-aside width="200px" class="app-aside">
+          <el-menu
+            :default-active="activeMenu"
+            router
+            class="el-menu-vertical"
+          >
+            <el-menu-item index="drug-management" @click="activeMenu = 'drug-management'">
+              <el-icon><Box /></el-icon>
+              <span>药品管理</span>
+            </el-menu-item>
+            <el-menu-item index="user-management" @click="activeMenu = 'user-management'">
+              <el-icon><User /></el-icon>
+              <span>用户管理</span>
+            </el-menu-item>
+          </el-menu>
+        </el-aside>
+        
+        <!-- 主内容区 -->
+        <el-main class="app-main">
+          <!-- 药品管理页面 -->
+          <keep-alive>
+            <drug-management v-if="activeMenu === 'drug-management'" />
+            <div v-else-if="activeMenu === 'user-management'">
+              <h3>用户管理功能尚未实现</h3>
+            </div>
+          </keep-alive>
+        </el-main>
+      </el-container>
+    </el-container>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessageBox } from 'element-plus'
+import { UserFilled, User, Box } from '@element-plus/icons-vue'
+import LoginPage from './LoginPage.vue'
+import DrugManagement from './DrugManagement.vue'
+
+// 登录状态
+const isLoggedIn = ref(false)
+const userInfo = reactive({
+  id: null,
+  username: '',
+  role: ''
+})
+
+// 当前激活的菜单
+const activeMenu = ref('drug-management')
+
+// 页面加载时检查用户是否已登录
+onMounted(() => {
+  checkLoginStatus()
+})
+
+// 检查登录状态
+const checkLoginStatus = () => {
+  const userStr = localStorage.getItem('user')
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr)
+      userInfo.id = user.id
+      userInfo.username = user.username
+      userInfo.role = user.role
+      isLoggedIn.value = true
+    } catch (e) {
+      console.error('解析用户数据失败', e)
+      localStorage.removeItem('user')
+    }
+  }
+}
+
+// 登录成功处理
+const handleLoginSuccess = (user) => {
+  userInfo.id = user.id
+  userInfo.username = user.username
+  userInfo.role = user.role
+  isLoggedIn.value = true
+}
+
+// 下拉菜单命令处理
+const handleCommand = (command) => {
+  if (command === 'logout') {
+    ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }).then(() => {
+      // 清除本地存储
+      localStorage.removeItem('user')
+      // 重置状态
+      isLoggedIn.value = false
+      userInfo.id = null
+      userInfo.username = ''
+      userInfo.role = ''
+    }).catch(() => {})
+  } else if (command === 'profile') {
+    ElMessageBox.alert(`用户ID: ${userInfo.id}<br>用户名: ${userInfo.username}<br>角色: ${userInfo.role}`, '用户信息', {
+      dangerouslyUseHTMLString: true,
+      confirmButtonText: '确定'
+    })
+  }
+}
+</script>
+
+<style scoped>
+.app-container {
+  height: 100vh;
+  width: 100%;
+}
+
+.main-container {
+  height: 100%;
+}
+
+.app-header {
+  background-color: #409EFF;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  position: relative;
+  z-index: 10;
+}
+
+.header-title {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-aside {
+  background-color: #fff;
+  border-right: 1px solid #e6e6e6;
+}
+
+.el-menu-vertical {
+  height: 100%;
+  border-right: none;
+}
+
+.app-main {
+  background-color: #f5f7fa;
+  padding: 20px;
+}
+</style> 
