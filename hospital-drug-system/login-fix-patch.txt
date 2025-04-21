@@ -1,0 +1,110 @@
+================== LoginPage.vue 修改 ==================
+// 登录处理
+const handleLogin = async () => {
+  if (!loginForm.username || !loginForm.password) {
+    ElMessage.warning('请输入用户名和密码')
+    return
+  }
+  
+  loading.value = true
+  
+  try {
+    console.log('正在发送登录请求，用户名:', loginForm.username)
+    const response = await axios.post('/auth/login', {
+      username: loginForm.username,
+      password: loginForm.password
+    })
+    
+    console.log('登录响应完整数据:', response.data) // 添加更详细的日志
+    
+    // 确保正确提取用户信息
+    const userData = {
+      id: response.data.user?.id || response.data.id,
+      username: response.data.user?.username || response.data.username || loginForm.username,
+      role: response.data.user?.role || response.data.role
+    }
+    
+    // 确保角色信息存在，如果不存在则使用默认值USER
+    if (!userData.role) {
+      console.warn('角色信息缺失，设置默认角色为USER')
+      userData.role = 'USER'
+    }
+    
+    console.log('格式化后的用户数据:', userData)
+    
+    // 存储token和用户信息
+    localStorage.setItem('token', response.data.token)
+    localStorage.setItem('user', JSON.stringify(userData))
+    
+    // 验证数据是否成功存储
+    const storedData = localStorage.getItem('user')
+    console.log('从localStorage读取的用户数据:', storedData)
+    
+    ElMessage.success('登录成功')
+    
+    // 通知父组件登录成功
+    emit('login-success', userData)
+    
+    // 使用router导航到主页
+    router.push('/')
+  } catch (error) {
+    console.error('登录失败:', error)
+    ElMessage.error(error.response?.data?.message || '登录失败，请检查用户名和密码')
+  } finally {
+    loading.value = false
+  }
+}
+
+================== MainLayout.vue 修改 ==================
+// 加载用户信息
+const loadUserInfo = () => {
+  console.log('执行loadUserInfo函数...')
+  const userStr = localStorage.getItem('user')
+  console.log('从localStorage获取的原始数据:', userStr)
+  
+  if (userStr) {
+    try {
+      const user = JSON.parse(userStr)
+      console.log('解析后的用户信息:', user)
+      
+      // 清除旧数据
+      userInfo.id = null
+      userInfo.username = ''
+      userInfo.role = ''
+      
+      // 设置新数据
+      userInfo.id = user.id
+      userInfo.username = user.username || '未知用户'
+      userInfo.role = user.role || 'USER'
+      
+      console.log('设置后的userInfo状态:', JSON.stringify(userInfo))
+      
+      // 如果是普通用户尝试访问管理员页面，重定向到药品管理页面
+      if (userInfo.role !== 'ADMIN' && 
+          (route.path === '/user-management' || route.path === '/system-settings')) {
+        console.warn('无权限访问:', route.path)
+        router.push('/drug-management')
+      }
+    } catch (e) {
+      console.error('解析用户数据失败', e)
+      router.push('/login')
+    }
+  } else {
+    console.warn('未找到用户数据，重定向到登录页')
+    router.push('/login')
+  }
+}
+
+// 在onMounted中添加以下代码
+onMounted(() => {
+  console.log('MainLayout组件已挂载，正在加载用户信息...')
+  loadUserInfo()
+  
+  // 增加监听器，确保localStorage中的用户数据变化时重新加载
+  window.addEventListener('storage', (event) => {
+    if (event.key === 'user') {
+      console.log('检测到用户数据变化，重新加载用户信息')
+      loadUserInfo()
+    }
+  })
+}) 

@@ -33,6 +33,16 @@ public class OperationLog {
         this.timestamp = LocalDateTime.now();
     }
     
+    // 添加带时间戳的构造函数
+    public OperationLog(String username, String action, Long drugId, String drugName, String details, LocalDateTime timestamp) {
+        this.username = username;
+        this.action = action;
+        this.drugId = drugId;
+        this.drugName = drugName;
+        this.details = details;
+        this.timestamp = timestamp;
+    }
+    
     // Getters and Setters
     public Long getId() {
         return id;

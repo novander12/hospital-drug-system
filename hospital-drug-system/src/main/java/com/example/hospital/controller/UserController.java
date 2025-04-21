@@ -1,5 +1,6 @@
 package com.example.hospital.controller;
 
+import com.example.hospital.model.LoginHistory;
 import com.example.hospital.model.User;
 import com.example.hospital.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,9 +10,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/users")
@@ -19,6 +19,58 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+
+    private static final Map<String, User> USERS = new HashMap<>();
+    private static final List<LoginHistory> LOGIN_HISTORY = new ArrayList<>();
+    
+    static {
+        // 添加测试用户数据
+        User admin = new User();
+        admin.setUsername("admin");
+        admin.setRealName("管理员");
+        admin.setRole("ADMIN");
+        admin.setDepartment("管理部");
+        admin.setEmail("admin@hospital.com");
+        admin.setPhone("13800138000");
+        USERS.put(admin.getUsername(), admin);
+        
+        User nurse = new User();
+        nurse.setUsername("nurse");
+        nurse.setRealName("张护士");
+        nurse.setRole("NURSE");
+        nurse.setDepartment("内科");
+        nurse.setEmail("nurse@hospital.com");
+        nurse.setPhone("13800138001");
+        USERS.put(nurse.getUsername(), nurse);
+        
+        User pharmacist = new User();
+        pharmacist.setUsername("pharmacist");
+        pharmacist.setRealName("李药师");
+        pharmacist.setRole("PHARMACIST");
+        pharmacist.setDepartment("药剂科");
+        pharmacist.setEmail("pharmacist@hospital.com");
+        pharmacist.setPhone("13800138002");
+        USERS.put(pharmacist.getUsername(), pharmacist);
+        
+        // 添加登录历史测试数据
+        LoginHistory h1 = new LoginHistory();
+        h1.setId(1L);
+        h1.setUsername("admin");
+        h1.setLoginTime(LocalDateTime.now().minusDays(1));
+        h1.setIpAddress("192.168.1.100");
+        h1.setDevice("Chrome 95.0.4638.69 / Windows 10");
+        h1.setStatus("SUCCESS");
+        LOGIN_HISTORY.add(h1);
+        
+        LoginHistory h2 = new LoginHistory();
+        h2.setId(2L);
+        h2.setUsername("nurse");
+        h2.setLoginTime(LocalDateTime.now().minusHours(5));
+        h2.setIpAddress("192.168.1.101");
+        h2.setDevice("Firefox 94.0 / MacOS");
+        h2.setStatus("SUCCESS");
+        LOGIN_HISTORY.add(h2);
+    }
 
     /**
      * 检查当前用户是否有管理员权限
@@ -226,5 +278,70 @@ public class UserController {
         response.put("status", "error");
         response.put("message", message);
         return response;
+    }
+
+    @GetMapping("/profile")
+    public ResponseEntity<User> getUserProfile() {
+        // 在实际应用中，应该从认证上下文中获取当前用户
+        // 这里简单返回第一个用户作为演示
+        String username = "admin"; // 模拟当前登录用户
+        User user = USERS.get(username);
+        
+        if (user == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        return ResponseEntity.ok(user);
+    }
+    
+    @PutMapping("/profile")
+    public ResponseEntity<User> updateUserProfile(@RequestBody User userUpdate) {
+        // 在实际应用中，应该从认证上下文中获取当前用户
+        String username = "admin"; // 模拟当前登录用户
+        User user = USERS.get(username);
+        
+        if (user == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        // 只允许更新部分字段
+        if (userUpdate.getRealName() != null) {
+            user.setRealName(userUpdate.getRealName());
+        }
+        if (userUpdate.getDepartment() != null) {
+            user.setDepartment(userUpdate.getDepartment());
+        }
+        if (userUpdate.getEmail() != null) {
+            user.setEmail(userUpdate.getEmail());
+        }
+        if (userUpdate.getPhone() != null) {
+            user.setPhone(userUpdate.getPhone());
+        }
+        
+        return ResponseEntity.ok(user);
+    }
+    
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> passwordData) {
+        // 在实际应用中，应该从认证上下文中获取当前用户
+        String username = "admin"; // 模拟当前登录用户
+        
+        String currentPassword = passwordData.get("currentPassword");
+        String newPassword = passwordData.get("newPassword");
+        
+        if (currentPassword == null || newPassword == null) {
+            return ResponseEntity.badRequest().body("当前密码和新密码不能为空");
+        }
+        
+        // 在实际应用中，应该验证当前密码是否正确
+        // 并对新密码进行安全哈希处理
+        
+        return ResponseEntity.ok().body("密码修改成功");
+    }
+    
+    @GetMapping("/login-history")
+    public ResponseEntity<List<LoginHistory>> getLoginHistory() {
+        // 在实际应用中，应该根据当前用户过滤历史记录
+        return ResponseEntity.ok(LOGIN_HISTORY);
     }
 } 

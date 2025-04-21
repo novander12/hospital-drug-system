@@ -56,6 +56,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- MySQL 数据库 -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>5.1.49</version>
+        </dependency>
+
         <!-- Spring Security -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -144,6 +151,15 @@
                 <version>2.22.2</version>
             </plugin>
         </plugins>
+        
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>static/node_modules/**</exclude>
+                </excludes>
+            </resource>
+        </resources>
     </build>
 
 </project>

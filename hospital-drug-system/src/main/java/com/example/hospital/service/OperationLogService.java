@@ -112,4 +112,14 @@ public class OperationLogService {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null ? authentication.getName() : "system";
     }
+
+    // 添加 countLogs 方法
+    public long countLogs() {
+        return operationLogRepository.count();
+    }
+
+    // 添加 saveLog 方法
+    public void saveLog(OperationLog log) {
+        operationLogRepository.save(log);
+    }
 } 

@@ -32,6 +32,21 @@ public class Drug {
     
     private String supplier;
     private String category; // 药品类别，如：抗生素、解热镇痛、维生素等
+    
+    // 添加无参构造函数 (JPA 需要)
+    public Drug() {
+    }
+    
+    // 添加带所有参数的构造函数
+    public Drug(String name, String spec, String supplier, String category, Integer stock, String unit, Double price, LocalDate expirationDate) {
+        this.name = name;
+        this.spec = spec;
+        this.supplier = supplier;
+        this.category = category;
+        this.stock = stock;
+        // 注意: 'unit' 和 'price' 在当前模型中不存在，已省略
+        this.expirationDate = expirationDate;
+    }
 
     // Getters and Setters
     public Long getId() {

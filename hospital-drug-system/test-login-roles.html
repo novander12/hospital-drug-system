@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户角色测试</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f5f7fa;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+    }
+    h1 {
+      color: #409EFF;
+      text-align: center;
+    }
+    .test-section {
+      margin-bottom: 20px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .test-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    button {
+      background-color: #409EFF;
+      color: white;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+    button:hover {
+      background-color: #66b1ff;
+    }
+    .result {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #f0f0f0;
+      border-radius: 4px;
+      min-height: 20px;
+    }
+    .success {
+      color: green;
+    }
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>医院药品管理系统 - 用户角色测试</h1>
+    
+    <div class="test-section">
+      <div class="test-title">1. 检查当前登录信息</div>
+      <button onclick="checkCurrentLogin()">检查当前登录</button>
+      <button onclick="clearLogin()">清除登录信息</button>
+      <div id="login-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+      <div class="test-title">2. 模拟用户登录</div>
+      <button onclick="simulateLogin('admin', 'ADMIN')">模拟管理员登录</button>
+      <button onclick="simulateLogin('user', 'USER')">模拟普通用户登录</button>
+      <div id="simulate-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+      <div class="test-title">3. 权限访问测试</div>
+      <button onclick="testPageAccess('/drug-management')">测试药品管理访问</button>
+      <button onclick="testPageAccess('/user-management')">测试用户管理访问</button>
+      <button onclick="testPageAccess('/system-settings')">测试系统设置访问</button>
+      <div id="access-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+      <div class="test-title">4. 完整登录流程测试</div>
+      <p>请打开浏览器控制台，然后点击下面的按钮：</p>
+      <button onclick="window.open('/login', '_blank')">打开登录页面</button>
+      <p>在登录页面登录后，返回此页面点击下面的按钮检查结果：</p>
+      <button onclick="checkAfterRealLogin()">检查实际登录结果</button>
+      <div id="real-login-result" class="result"></div>
+    </div>
+  </div>
+
+  <script>
+    // 检查当前登录信息
+    function checkCurrentLogin() {
+      const result = document.getElementById('login-result');
+      const userStr = localStorage.getItem('user');
+      const token = localStorage.getItem('token');
+      
+      if (!userStr || !token) {
+        result.innerHTML = '<span class="error">当前未登录</span>';
+        return;
+      }
+      
+      try {
+        const user = JSON.parse(userStr);
+        result.innerHTML = `
+          <span class="success">当前已登录</span><br>
+          用户ID: ${user.id || 'undefined'}<br>
+          用户名: ${user.username || 'undefined'}<br>
+          角色: ${user.role || 'undefined'}<br>
+          Token: ${token ? token.substring(0, 15) + '...' : 'undefined'}
+        `;
+      } catch (e) {
+        result.innerHTML = `<span class="error">解析用户数据失败: ${e.message}</span>`;
+      }
+    }
+    
+    // 清除登录信息
+    function clearLogin() {
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      document.getElementById('login-result').innerHTML = '<span class="success">已清除登录信息</span>';
+    }
+    
+    // 模拟用户登录
+    function simulateLogin(username, role) {
+      const result = document.getElementById('simulate-result');
+      
+      // 创建模拟用户数据
+      const user = {
+        id: Math.floor(Math.random() * 1000),
+        username: username,
+        role: role
+      };
+      
+      // 创建模拟token
+      const token = 'test_token_' + Math.random().toString(36).substring(2);
+      
+      // 存储数据
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', token);
+      
+      result.innerHTML = `
+        <span class="success">模拟登录成功</span><br>
+        用户名: ${username}<br>
+        角色: ${role}<br>
+        模拟Token: ${token.substring(0, 15) + '...'}
+      `;
+    }
+    
+    // 测试页面访问权限
+    function testPageAccess(page) {
+      const result = document.getElementById('access-result');
+      const userStr = localStorage.getItem('user');
+      
+      if (!userStr) {
+        result.innerHTML = '<span class="error">未登录，无法测试访问权限</span>';
+        return;
+      }
+      
+      try {
+        const user = JSON.parse(userStr);
+        const isAdmin = user.role === 'ADMIN';
+        
+        let accessResult = '';
+        
+        if (page === '/drug-management') {
+          // 所有用户都可以访问药品管理
+          accessResult = '<span class="success">✓ 允许访问</span>';
+        } else if ((page === '/user-management' || page === '/system-settings') && !isAdmin) {
+          // 非管理员不能访问这些页面
+          accessResult = '<span class="error">✗ 禁止访问 (会被重定向)</span>';
+        } else if ((page === '/user-management' || page === '/system-settings') && isAdmin) {
+          // 管理员可以访问这些页面
+          accessResult = '<span class="success">✓ 允许访问</span>';
+        }
+        
+        result.innerHTML = `
+          用户: ${user.username} (${user.role})<br>
+          页面: ${page}<br>
+          访问结果: ${accessResult}
+        `;
+      } catch (e) {
+        result.innerHTML = `<span class="error">解析用户数据失败: ${e.message}</span>`;
+      }
+    }
+    
+    // 检查实际登录后的结果
+    function checkAfterRealLogin() {
+      const result = document.getElementById('real-login-result');
+      
+      // 获取当前登录信息
+      checkCurrentLogin();
+      
+      // 复制登录结果到这个区域
+      result.innerHTML = document.getElementById('login-result').innerHTML;
+      
+      // 添加访问建议
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          const isAdmin = user.role === 'ADMIN';
+          
+          let suggestion = '<br><br>建议测试:<br>';
+          suggestion += '- 访问药品管理页面 (/drug-management)<br>';
+          
+          if (isAdmin) {
+            suggestion += '- 访问用户管理页面 (/user-management)<br>';
+            suggestion += '- 访问系统设置页面 (/system-settings)<br>';
+          } else {
+            suggestion += '- 尝试直接访问用户管理页面，确认是否被重定向<br>';
+            suggestion += '- 尝试直接访问系统设置页面，确认是否被重定向<br>';
+          }
+          
+          result.innerHTML += suggestion;
+        } catch (e) {
+          // 忽略错误
+        }
+      }
+    }
+    
+    // 页面加载时检查登录状态
+    window.onload = function() {
+      checkCurrentLogin();
+    };
+  </script>
+</body>
+</html> 

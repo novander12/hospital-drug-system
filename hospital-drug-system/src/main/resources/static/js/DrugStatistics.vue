@@ -33,9 +33,20 @@ echarts.use([
 ])
 
 const categoryChart = ref(null)
+const dateRange = ref([])
 let chart = null
 
+// 页面载入时加载数据
 onMounted(() => {
+  // 设置默认查询时间范围为过去7天
+  dateRange.value = [
+    new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    new Date()
+  ]
+  fetchDrugCategories()
+  fetchDrugList()
+  fetchTransactionData()
+  
   // 初始化图表
   initChart()
   

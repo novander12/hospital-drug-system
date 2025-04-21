@@ -98,8 +98,12 @@ import { ref, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import axios from 'axios'
+import { useRouter } from 'vue-router'
 
 const emit = defineEmits(['login-success'])
+
+// 获取router实例
+const router = useRouter()
 
 // 当前激活的标签页
 const activeTab = ref('login')
@@ -158,45 +162,59 @@ const registerRules = {
 const loading = ref(false)
 
 // 登录处理
-const handleLogin = () => {
-  if (!loginFormRef.value) return
+const handleLogin = async () => {
+  if (!loginForm.username || !loginForm.password) {
+    ElMessage.warning('请输入用户名和密码')
+    return
+  }
   
-  loginFormRef.value.validate(async (valid) => {
-    if (!valid) return
+  loading.value = true
+  
+  try {
+    console.log('正在发送登录请求，用户名:', loginForm.username)
+    const response = await axios.post('/auth/login', {
+      username: loginForm.username,
+      password: loginForm.password
+    })
     
-    loading.value = true
+    console.log('登录响应完整数据:', response.data) // 添加更详细的日志
     
-    try {
-      const response = await axios.post('/auth/login', loginForm)
-      
-      // 登录成功
-      if (response.data) {
-        // 从响应中提取用户信息
-        const userData = {
-          id: response.data.id,
-          username: response.data.username || loginForm.username,
-          role: response.data.role
-        }
-        
-        // 存储用户信息到本地存储
-        localStorage.setItem('user', JSON.stringify(userData))
-        // 存储JWT令牌
-        localStorage.setItem('token', response.data.token)
-        
-        ElMessage.success('登录成功')
-        
-        // 通知父组件登录成功
-        emit('login-success', userData)
-      } else {
-        ElMessage.error('登录失败')
-      }
-    } catch (error) {
-      console.error('登录失败:', error)
-      ElMessage.error(error.response?.data?.message || '登录失败，请检查用户名和密码')
-    } finally {
-      loading.value = false
+    // 确保正确提取用户信息
+    const userData = {
+      id: response.data.user?.id || response.data.id,
+      username: response.data.user?.username || response.data.username || loginForm.username,
+      role: response.data.user?.role || response.data.role
     }
-  })
+    
+    // 确保角色信息存在，如果不存在则使用默认值USER
+    if (!userData.role) {
+      console.warn('角色信息缺失，设置默认角色为USER')
+      userData.role = 'USER'
+    }
+    
+    console.log('格式化后的用户数据:', userData)
+    
+    // 存储token和用户信息
+    localStorage.setItem('token', response.data.token)
+    localStorage.setItem('user', JSON.stringify(userData))
+    
+    // 验证数据是否成功存储
+    const storedData = localStorage.getItem('user')
+    console.log('从localStorage读取的用户数据:', storedData)
+    
+    ElMessage.success('登录成功')
+    
+    // 通知父组件登录成功
+    emit('login-success', userData)
+    
+    // 使用router导航到主页
+    router.push('/')
+  } catch (error) {
+    console.error('登录失败:', error)
+    ElMessage.error(error.response?.data?.message || '登录失败，请检查用户名和密码')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 注册处理

@@ -16,6 +16,10 @@ public class User {
     private String username;
     private String password;
     private String role;
+    private String realName;
+    private String department;
+    private String email;
+    private String phone;
 
     // Getters and Setters
     public Long getId() {
@@ -49,6 +53,38 @@ public class User {
     public void setRole(String role) {
         this.role = role;
     }
+
+    public String getRealName() {
+        return realName;
+    }
+
+    public void setRealName(String realName) {
+        this.realName = realName;
+    }
+
+    public String getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
     
     @Override
     public String toString() {
@@ -56,6 +92,8 @@ public class User {
                 "id=" + id +
                 ", username='" + username + '\'' +
                 ", role='" + role + '\'' +
+                ", realName='" + realName + '\'' +
+                ", department='" + department + '\'' +
                 '}';
     }
 } 

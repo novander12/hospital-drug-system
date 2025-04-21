@@ -30,6 +30,9 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         final String authorizationHeader = request.getHeader("Authorization");
+        String requestURI = request.getRequestURI();
+        
+        logger.debug("处理请求: " + requestURI + ", Authorization 头: " + (authorizationHeader != null ? "存在" : "不存在"));
 
         String username = null;
         String jwt = null;
@@ -39,9 +42,12 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             jwt = authorizationHeader.substring(7);
             try {
                 username = jwtUtil.extractUsername(jwt);
+                logger.debug("从JWT中提取的用户名: " + username);
             } catch (Exception e) {
-                logger.error("JWT令牌无效: " + e.getMessage());
+                logger.error("JWT令牌无效: " + e.getMessage(), e);
             }
+        } else if (authorizationHeader != null) {
+            logger.warn("Authorization头格式不正确，应以'Bearer '开头: " + authorizationHeader);
         }
 
         // 如果从JWT中提取到用户名，且当前SecurityContext中没有认证信息
@@ -56,6 +62,9 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 
                 // 更新SecurityContext中的认证信息
                 SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                logger.debug("认证成功，用户: " + username + ", 权限: " + userDetails.getAuthorities());
+            } else {
+                logger.warn("JWT令牌验证失败，用户: " + username);
             }
         }
         chain.doFilter(request, response);

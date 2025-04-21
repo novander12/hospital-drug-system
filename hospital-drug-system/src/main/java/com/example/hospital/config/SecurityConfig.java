@@ -45,10 +45,11 @@ public class SecurityConfig {
                 .antMatchers("/api/users/login", "/api/users/register", "/api/users/check").permitAll()
                 .antMatchers("/api/test/**").permitAll()
                 .antMatchers("/auth/**").permitAll()
+                .antMatchers("/api/drugs/public/**", "/api/drugs/categories").permitAll() // 允许公开访问的药品API
                 .antMatchers("/api/drugs/admin/**").hasRole("ADMIN")
                 .antMatchers("/api/settings/**").hasRole("ADMIN")
-                .antMatchers("/api/drugs/**").permitAll()
-                .antMatchers("/", "/js/**", "/css/**", "/assets/**", "/h2-console/**").permitAll()
+                .antMatchers("/api/drugs/**").authenticated()
+                .antMatchers("/", "/js/**", "/css/**", "/assets/**", "/h2-console/**", "/favicon.ico").permitAll()
                 .anyRequest().authenticated()
                 .and()
             .sessionManagement()
@@ -70,7 +71,7 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:8081", "http://localhost:63342", "http://127.0.0.1:5500", "http://localhost:5173"));
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:8081", "http://localhost:63342", "http://127.0.0.1:5500", "http://localhost:5173", "http://localhost:8080"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(false);
