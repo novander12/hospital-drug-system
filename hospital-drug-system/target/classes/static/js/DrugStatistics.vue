@@ -39,18 +39,18 @@ let chart = null
 // 页面载入时加载数据
 onMounted(() => {
   // 设置默认查询时间范围为过去7天
-  dateRange.value = [
-    new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-    new Date()
-  ]
-  fetchDrugCategories()
-  fetchDrugList()
-  fetchTransactionData()
+  // dateRange.value = [ // dateRange functionality might need review later
+  //   new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+  //   new Date()
+  // ]
+  // fetchDrugCategories() // Removed undefined function call
+  // fetchDrugList() // Removed undefined function call
+  // fetchTransactionData() // Removed undefined function call
   
   // 初始化图表
   initChart()
   
-  // 加载数据
+  // 加载数据 (Keep the defined function)
   fetchCategoryData()
   
   // 响应式调整图表大小

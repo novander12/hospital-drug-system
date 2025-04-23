@@ -1,16 +1,19 @@
 package com.example.hospital.config;
 
+import com.example.hospital.model.Role;
 import com.example.hospital.repository.UserRepository;
 import com.example.hospital.security.JwtRequestFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -26,6 +29,7 @@ import java.util.Collections;
 
 @Configuration
 @EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final UserRepository userRepository;
@@ -40,30 +44,31 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .cors().and().csrf().disable()  // 在生产环境中应启用CSRF保护
-            .authorizeRequests()
-                .antMatchers("/api/users/login", "/api/users/register", "/api/users/check").permitAll()
-                .antMatchers("/api/test/**").permitAll()
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
                 .antMatchers("/auth/**").permitAll()
-                .antMatchers("/api/drugs/public/**", "/api/drugs/categories").permitAll() // 允许公开访问的药品API
-                .antMatchers("/api/drugs/admin/**").hasRole("ADMIN")
-                .antMatchers("/api/settings/**").hasRole("ADMIN")
-                .antMatchers("/api/drugs/**").authenticated()
+                .antMatchers(HttpMethod.GET, "/api/drugs", "/api/drugs/search", "/api/drugs/categories").permitAll()
                 .antMatchers("/", "/js/**", "/css/**", "/assets/**", "/h2-console/**", "/favicon.ico").permitAll()
+                .antMatchers("/api/users/**").hasRole(Role.ADMIN.name())
+                .antMatchers(HttpMethod.POST, "/api/drugs").hasRole(Role.ADMIN.name())
+                .antMatchers(HttpMethod.PUT, "/api/drugs/**").hasRole(Role.ADMIN.name())
+                .antMatchers(HttpMethod.DELETE, "/api/drugs/**").hasRole(Role.ADMIN.name())
+                .antMatchers(HttpMethod.POST, "/api/drugs/*/batches").hasAnyRole(Role.ADMIN.name(), Role.PHARMACIST.name())
+                .antMatchers(HttpMethod.GET, "/api/drugs/**").authenticated()
+                .antMatchers(HttpMethod.POST, "/api/prescriptions").hasAnyRole(Role.ADMIN.name(), Role.PHARMACIST.name())
+                .antMatchers(HttpMethod.PUT, "/api/prescriptions/*/status").hasAnyRole(Role.ADMIN.name(), Role.PHARMACIST.name(), Role.NURSE.name())
+                .antMatchers("/api/prescriptions/**").authenticated()
+                .antMatchers("/api/reports/**").hasRole(Role.ADMIN.name())
+                .antMatchers(HttpMethod.GET, "/api/logs/my").authenticated()
+                .antMatchers(HttpMethod.GET, "/api/logs", "/api/logs/drug/**").hasRole(Role.ADMIN.name())
                 .anyRequest().authenticated()
-                .and()
-            .sessionManagement()
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // 不创建session
-                .and()
-            .formLogin()
-                .disable()
-            .logout()
-                .permitAll()
-                .and()
-            .headers().frameOptions().disable(); // 为了H2控制台可以正常访问
-        
-        // 添加JWT过滤器
-        http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+            )
+            .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
+            .formLogin(form -> form.disable())
+            .httpBasic(basic -> basic.disable())
+            .headers(headers -> headers.frameOptions().disable());
         
         return http.build();
     }
@@ -86,12 +91,15 @@ public class SecurityConfig {
         return username -> {
             com.example.hospital.model.User user = userRepository.findByUsername(username);
             if (user == null) {
-                throw new UsernameNotFoundException("用户不存在");
+                throw new UsernameNotFoundException("用户不存在: " + username);
+            }
+            if (user.getRole() == null) {
+                 throw new IllegalStateException("用户 " + username + " 的角色未设置!");
             }
             return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword(),
-                Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + user.getRole()))
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
             );
         };
     }

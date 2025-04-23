@@ -9,6 +9,14 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Future;
 import java.time.LocalDate;
+import javax.persistence.Column;
+import javax.persistence.OneToMany;
+import javax.persistence.FetchType;
+import javax.persistence.CascadeType;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+import javax.persistence.Transient;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 public class Drug {
@@ -20,18 +28,19 @@ public class Drug {
     @NotBlank(message = "药品名称不能为空")
     private String name;
     
-    @NotBlank(message = "药品规格不能为空")
+    @Column(nullable = false)
     private String spec;
     
-    @NotNull(message = "库存不能为空")
-    @Min(value = 0, message = "库存不能为负数")
-    private Integer stock;
+    @Column(nullable = false)
+    private String category;
     
-    @NotNull(message = "有效期不能为空")
-    private LocalDate expirationDate;
-    
+    @Column(nullable = false)
     private String supplier;
-    private String category; // 药品类别，如：抗生素、解热镇痛、维生素等
+    
+    // ADD OneToMany relationship to DrugBatch
+    @OneToMany(mappedBy = "drug", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @JsonManagedReference // To prevent serialization loop with DrugBatch
+    private List<DrugBatch> batches = new ArrayList<>();
     
     // 添加无参构造函数 (JPA 需要)
     public Drug() {
@@ -43,9 +52,7 @@ public class Drug {
         this.spec = spec;
         this.supplier = supplier;
         this.category = category;
-        this.stock = stock;
         // 注意: 'unit' 和 'price' 在当前模型中不存在，已省略
-        this.expirationDate = expirationDate;
     }
 
     // Getters and Setters
@@ -73,22 +80,6 @@ public class Drug {
         this.spec = spec;
     }
 
-    public Integer getStock() {
-        return stock;
-    }
-
-    public void setStock(Integer stock) {
-        this.stock = stock;
-    }
-
-    public LocalDate getExpirationDate() {
-        return expirationDate;
-    }
-
-    public void setExpirationDate(LocalDate expirationDate) {
-        this.expirationDate = expirationDate;
-    }
-
     public String getSupplier() {
         return supplier;
     }
@@ -103,5 +94,38 @@ public class Drug {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    // ADD getter/setter for batches
+    public List<DrugBatch> getBatches() {
+        return batches;
+    }
+
+    public void setBatches(List<DrugBatch> batches) {
+        this.batches = batches;
+    }
+
+    // Helper method to add a batch
+    public void addBatch(DrugBatch batch) {
+        batches.add(batch);
+        batch.setDrug(this);
+    }
+
+    // Helper method to remove a batch
+    public void removeBatch(DrugBatch batch) {
+        batches.remove(batch);
+        batch.setDrug(null);
+    }
+    
+    // Optional: Method to calculate total stock from batches
+    // This might be better placed in a DTO or service layer
+    @Transient // Mark as not persistent if added here
+    public Integer getTotalStock() {
+        if (batches == null) {
+            return 0;
+        }
+        return batches.stream()
+                      .mapToInt(DrugBatch::getQuantity)
+                      .sum();
     }
 } 

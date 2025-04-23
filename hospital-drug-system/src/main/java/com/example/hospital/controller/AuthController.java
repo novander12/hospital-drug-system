@@ -1,5 +1,6 @@
 package com.example.hospital.controller;
 
+import com.example.hospital.model.Role;
 import com.example.hospital.model.User;
 import com.example.hospital.service.UserService;
 import com.example.hospital.util.JwtUtil;
@@ -54,7 +55,7 @@ public class AuthController {
             Map<String, Object> userInfo = new HashMap<>();
             userInfo.put("id", user.getId());
             userInfo.put("username", user.getUsername());
-            userInfo.put("role", user.getRole());
+            userInfo.put("role", user.getRole() != null ? user.getRole().name() : null);
             response.put("user", userInfo);
             
             // 生成JWT令牌
@@ -102,7 +103,7 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody Map<String, String> registerRequest) {
         String username = registerRequest.get("username");
         String password = registerRequest.get("password");
-        String role = registerRequest.get("role");
+        String roleStr = registerRequest.get("role");
         
         // 验证请求参数
         if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
@@ -120,27 +121,32 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         }
         
-        // 创建新用户
-        User newUser = new User();
-        newUser.setUsername(username);
-        newUser.setPassword(password);
-        newUser.setRole(role != null && !role.isEmpty() ? role : "USER");
-        
-        User createdUser = userService.createUser(newUser);
+        // Convert role string to Role enum safely
+        Role userRole = Role.USER; // Default role
+        if (roleStr != null && !roleStr.isEmpty()) {
+            try {
+                userRole = Role.valueOf(roleStr.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                System.err.println("Invalid role provided during registration: " + roleStr + ". Defaulting to USER.");
+            }
+        }
+
+        // Call the correct createUser method
+        User createdUser = userService.createUser(username, password, userRole);
         
         // 创建响应
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
         response.put("message", "注册成功");
         
-        // 创建用户信息(不包含密码)
+        // 创建用户信息(不包含密码, role as string)
         Map<String, Object> userInfo = new HashMap<>();
         userInfo.put("id", createdUser.getId());
         userInfo.put("username", createdUser.getUsername());
-        userInfo.put("role", createdUser.getRole());
+        userInfo.put("role", createdUser.getRole() != null ? createdUser.getRole().name() : null);
         response.put("user", userInfo);
         
-        // 生成JWT令牌，实现注册后自动登录
+        // 生成JWT令牌
         String token = jwtUtil.generateToken(createdUser);
         response.put("token", token);
         

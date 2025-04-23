@@ -1,102 +1,70 @@
 package com.example.hospital.model;
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.NoArgsConstructor;
+// import lombok.AllArgsConstructor; // 如果需要
+
+import javax.persistence.*;
+import org.hibernate.annotations.CreationTimestamp; // 需要导入
+
 import java.time.LocalDateTime;
 
 @Entity
+@Table(name = "operation_logs") // 添加 Table 注解
+@Getter // 使用 Lombok
+@Setter // 使用 Lombok
+@NoArgsConstructor // JPA 需要无参构造函数
 public class OperationLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
+    @CreationTimestamp // 使用 CreationTimestamp 自动设置时间
+    @Column(nullable = false, updatable = false, name = "operation_time") // 明确列名并设为不可更新
+    private LocalDateTime timestamp; // 保留字段名 timestamp，但功能类似 operationTime
+
+    @Column(nullable = false) // 添加 Column 注解
     private String username;
-    private String action;
+
+    @Column(nullable = false, name = "operation_type") // 明确列名
+    private String action; // 保留字段名 action，但功能类似 operationType
+
+    @Column(nullable = false) // 添加新字段
+    private String operationResult; // 例如 SUCCESS, FAILURE
+
+    @Lob // 添加 Lob 注解
+    @Column(columnDefinition = "TEXT") // 明确类型
+    private String details; // 保留字段名 details
+
+    @Column // 保留 drugId
     private Long drugId;
+
+    @Column // 保留 drugName
     private String drugName;
-    private LocalDateTime timestamp;
-    private String details;
-    
-    // 构造函数
-    public OperationLog() {
-    }
-    
-    public OperationLog(String username, String action, Long drugId, String drugName, String details) {
+
+    // 可选：自定义构造函数用于方便创建日志
+    public OperationLog(String username, String action, String operationResult, String details, Long drugId, String drugName) {
         this.username = username;
-        this.action = action;
+        this.action = action; // 对应 operationType
+        this.operationResult = operationResult;
+        this.details = details; // 对应 operationDetails
         this.drugId = drugId;
         this.drugName = drugName;
-        this.details = details;
-        this.timestamp = LocalDateTime.now();
+        // timestamp 会自动设置 by @CreationTimestamp
     }
-    
-    // 添加带时间戳的构造函数
-    public OperationLog(String username, String action, Long drugId, String drugName, String details, LocalDateTime timestamp) {
+
+    // 添加构造函数以支持 DataInitializer 设置特定时间戳
+    public OperationLog(String username, String action, String operationResult, String details, Long drugId, String drugName, LocalDateTime timestamp) {
         this.username = username;
         this.action = action;
+        this.operationResult = operationResult;
+        this.details = details;
         this.drugId = drugId;
         this.drugName = drugName;
-        this.details = details;
-        this.timestamp = timestamp;
+        this.timestamp = timestamp; // 手动设置时间戳
     }
-    
-    // Getters and Setters
-    public Long getId() {
-        return id;
-    }
-    
-    public void setId(Long id) {
-        this.id = id;
-    }
-    
-    public String getUsername() {
-        return username;
-    }
-    
-    public void setUsername(String username) {
-        this.username = username;
-    }
-    
-    public String getAction() {
-        return action;
-    }
-    
-    public void setAction(String action) {
-        this.action = action;
-    }
-    
-    public Long getDrugId() {
-        return drugId;
-    }
-    
-    public void setDrugId(Long drugId) {
-        this.drugId = drugId;
-    }
-    
-    public String getDrugName() {
-        return drugName;
-    }
-    
-    public void setDrugName(String drugName) {
-        this.drugName = drugName;
-    }
-    
-    public LocalDateTime getTimestamp() {
-        return timestamp;
-    }
-    
-    public void setTimestamp(LocalDateTime timestamp) {
-        this.timestamp = timestamp;
-    }
-    
-    public String getDetails() {
-        return details;
-    }
-    
-    public void setDetails(String details) {
-        this.details = details;
-    }
+
+    // 移除旧的手动 Getters/Setters，因为使用了 Lombok @Getter/@Setter
 } 

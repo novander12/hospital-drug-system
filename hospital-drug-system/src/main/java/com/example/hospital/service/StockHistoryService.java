@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class StockHistoryService {
@@ -27,12 +28,14 @@ public class StockHistoryService {
     @Scheduled(cron = "0 0 0 * * ?") // 每天午夜运行
     @Transactional
     public void recordDailyStockSnapshot() {
-        // 获取所有药品
-        List<Drug> allDrugs = drugRepository.findAll();
+        // 获取所有药品 (需要加载批次信息)
+        // TODO: Optimize this by summing directly in the database if possible
+        List<Drug> allDrugs = drugRepository.findAllWithBatches(); // Use method that fetches batches
         
-        // 计算当前总库存
+        // 计算当前总库存 (Iterate through batches of each drug)
         int totalStock = allDrugs.stream()
-                .mapToInt(drug -> drug.getStock() != null ? drug.getStock() : 0)
+                .flatMap(drug -> drug.getBatches().stream()) // Flatten the stream of batches
+                .mapToInt(batch -> batch.getQuantity() != null ? batch.getQuantity() : 0)
                 .sum();
         
         // 获取今天的日期
@@ -57,12 +60,14 @@ public class StockHistoryService {
      */
     @Transactional
     public void recordStockSnapshotOnStartup() {
-        // 获取所有药品
-        List<Drug> allDrugs = drugRepository.findAll();
+        // 获取所有药品 (需要加载批次信息)
+        // TODO: Optimize this
+        List<Drug> allDrugs = drugRepository.findAllWithBatches();
         
-        // 计算当前总库存
+        // 计算当前总库存 (Iterate through batches)
         int totalStock = allDrugs.stream()
-                .mapToInt(drug -> drug.getStock() != null ? drug.getStock() : 0)
+                .flatMap(drug -> drug.getBatches().stream())
+                .mapToInt(batch -> batch.getQuantity() != null ? batch.getQuantity() : 0)
                 .sum();
         
         // 获取今天的日期

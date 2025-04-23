@@ -1,138 +1,133 @@
 package com.example.hospital.controller;
 
+import com.example.hospital.dto.PrescriptionCreateDTO;
+import com.example.hospital.dto.UpdateStatusRequestDTO;
 import com.example.hospital.model.Prescription;
-import com.example.hospital.model.PrescriptionDrug;
+import com.example.hospital.service.PrescriptionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
-import java.util.*;
+import javax.persistence.EntityNotFoundException;
+import javax.validation.Valid;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/prescriptions")
 public class PrescriptionController {
 
-    private static final Map<Long, Prescription> PRESCRIPTIONS = new HashMap<>();
-    private static long nextId = 1;
+    private static final Logger logger = LoggerFactory.getLogger(PrescriptionController.class);
 
-    static {
-        // 添加一些测试数据
-        Prescription p1 = new Prescription();
-        p1.setId(nextId++);
-        p1.setPatientName("张三");
-        p1.setPatientId("P20240001");
-        p1.setAge(45);
-        p1.setGender("male");
-        p1.setDepartment("内科");
-        p1.setDoctor("王医生");
-        p1.setDiagnosis("高血压");
-        p1.setStatus("PENDING");
-        p1.setCreateTime(LocalDateTime.now().minusDays(1));
-        
-        List<PrescriptionDrug> drugs1 = new ArrayList<>();
-        PrescriptionDrug drug1 = new PrescriptionDrug();
-        drug1.setDrugId(1L);
-        drug1.setDrugName("降压药");
-        drug1.setSpecification("10mg*30片");
-        drug1.setQuantity(1);
-        drug1.setUnit("盒");
-        drug1.setUsage("每日一次，每次一片");
-        drugs1.add(drug1);
-        p1.setDrugs(drugs1);
-        PRESCRIPTIONS.put(p1.getId(), p1);
+    private final PrescriptionService prescriptionService;
 
-        Prescription p2 = new Prescription();
-        p2.setId(nextId++);
-        p2.setPatientName("李四");
-        p2.setPatientId("P20240002");
-        p2.setAge(30);
-        p2.setGender("female");
-        p2.setDepartment("外科");
-        p2.setDoctor("李医生");
-        p2.setDiagnosis("轻度外伤");
-        p2.setStatus("APPROVED");
-        p2.setCreateTime(LocalDateTime.now().minusHours(12));
-        
-        List<PrescriptionDrug> drugs2 = new ArrayList<>();
-        PrescriptionDrug drug2 = new PrescriptionDrug();
-        drug2.setDrugId(1L);
-        drug2.setDrugName("消炎药");
-        drug2.setSpecification("5mg*20片");
-        drug2.setQuantity(1);
-        drug2.setUnit("盒");
-        drug2.setUsage("一日三次，饭后服用");
-        drugs2.add(drug2);
-        p2.setDrugs(drugs2);
-        PRESCRIPTIONS.put(p2.getId(), p2);
+    @Autowired
+    public PrescriptionController(PrescriptionService prescriptionService) {
+        this.prescriptionService = prescriptionService;
     }
 
-    @GetMapping
-    public ResponseEntity<List<Prescription>> getAllPrescriptions(
-            @RequestParam(required = false) String patientName,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
-        
-        List<Prescription> filteredPrescriptions = new ArrayList<>();
-        
-        for (Prescription prescription : PRESCRIPTIONS.values()) {
-            boolean matches = true;
-            
-            if (patientName != null && !patientName.isEmpty() && 
-                !prescription.getPatientName().contains(patientName)) {
-                matches = false;
-            }
-            
-            if (status != null && !status.isEmpty() && 
-                !prescription.getStatus().equals(status)) {
-                matches = false;
-            }
-            
-            // 此处可以添加日期范围过滤
-            
-            if (matches) {
-                filteredPrescriptions.add(prescription);
-            }
-        }
-        
-        return ResponseEntity.ok(filteredPrescriptions);
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<Prescription> getPrescriptionById(@PathVariable Long id) {
-        Prescription prescription = PRESCRIPTIONS.get(id);
-        if (prescription == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(prescription);
-    }
-
+    /**
+     * 创建新处方
+     */
     @PostMapping
-    public ResponseEntity<Prescription> createPrescription(@RequestBody Prescription prescription) {
-        prescription.setId(nextId++);
-        prescription.setCreateTime(LocalDateTime.now());
-        prescription.setStatus("PENDING");
-        
-        PRESCRIPTIONS.put(prescription.getId(), prescription);
-        return ResponseEntity.ok(prescription);
-    }
-
-    @PutMapping("/{id}/cancel")
-    public ResponseEntity<Prescription> cancelPrescription(@PathVariable Long id) {
-        Prescription prescription = PRESCRIPTIONS.get(id);
-        if (prescription == null) {
-            return ResponseEntity.notFound().build();
+    @PreAuthorize("hasRole('ADMIN') or hasRole('PHARMACIST')")
+    public ResponseEntity<?> createPrescription(@Valid @RequestBody PrescriptionCreateDTO createDTO) {
+        try {
+            Prescription createdPrescription = prescriptionService.createPrescription(createDTO);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdPrescription);
+        } catch (EntityNotFoundException | IllegalArgumentException e) {
+            logger.warn("创建处方失败: {}", e.getMessage());
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("status", "error");
+            responseBody.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(responseBody);
+        } catch (IllegalStateException e) {
+            logger.warn("创建处方失败: {}", e.getMessage());
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("status", "error");
+            responseBody.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(responseBody);
+        } catch (Exception e) {
+            logger.error("创建处方时发生意外错误", e);
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("status", "error");
+            responseBody.put("message", "创建处方失败，发生内部错误");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseBody);
         }
-        
-        prescription.setStatus("CANCELLED");
-        return ResponseEntity.ok(prescription);
     }
 
-    @GetMapping("/my")
-    public ResponseEntity<List<Prescription>> getMyPrescriptions() {
-        // 在实际应用中，这里应该从认证上下文中获取当前用户
-        // 并根据用户身份过滤处方
-        // 这里简单返回所有处方作为演示
-        return ResponseEntity.ok(new ArrayList<>(PRESCRIPTIONS.values()));
+    /**
+     * 获取所有处方 (包含药品项)
+     */
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<Prescription>> getAllPrescriptions() {
+        try {
+            List<Prescription> prescriptions = prescriptionService.getAllPrescriptions();
+            return ResponseEntity.ok(prescriptions);
+        } catch (Exception e) {
+            logger.error("获取处方列表时发生意外错误", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.emptyList());
+        }
+    }
+
+    /**
+     * 根据ID获取单个处方 (包含药品项)
+     */
+    @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getPrescriptionById(@PathVariable Long id) {
+        Optional<Prescription> prescriptionOpt = prescriptionService.getPrescriptionById(id);
+        if (prescriptionOpt.isPresent()) {
+            return ResponseEntity.ok(prescriptionOpt.get());
+        } else {
+            logger.warn("尝试获取不存在的处方，ID: {}", id);
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("status", "error");
+            responseBody.put("message", "处方不存在");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseBody);
+        }
+    }
+
+    /**
+     * 更新处方状态 (例如：审核通过、发药、取消)
+     */
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('PHARMACIST') or hasRole('NURSE')")
+    public ResponseEntity<?> updatePrescriptionStatus(@PathVariable Long id, 
+                                                  @Valid @RequestBody UpdateStatusRequestDTO requestDTO) {
+        try {
+            Prescription updatedPrescription = prescriptionService.updatePrescriptionStatus(
+                id, 
+                requestDTO.getNewStatus(),
+                requestDTO.getRemarks()
+            );
+            return ResponseEntity.ok(updatedPrescription);
+        } catch (EntityNotFoundException e) {
+            logger.warn("尝试更新不存在的处方状态，ID: {}", id);
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("status", "error");
+            responseBody.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(responseBody);
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            logger.warn("更新处方状态失败 (非法状态转换或库存不足)，ID: {}, 原因: {}", id, e.getMessage());
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("status", "error");
+            responseBody.put("message", e.getMessage());
+            return ResponseEntity.status(e instanceof IllegalStateException ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST).body(responseBody);
+        } catch (Exception e) {
+            logger.error("更新处方状态时发生意外错误, ID: {}", id, e);
+            Map<String, Object> responseBody = new HashMap<>();
+            responseBody.put("status", "error");
+            responseBody.put("message", "更新处方状态失败，发生内部错误");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(responseBody);
+        }
     }
 } 

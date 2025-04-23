@@ -1,13 +1,18 @@
 package com.example.hospital.service;
 
+import com.example.hospital.dto.UserDTO;
 import com.example.hospital.model.User;
+import com.example.hospital.model.Role;
 import com.example.hospital.repository.UserRepository;
+import com.example.hospital.dto.PasswordChangeRequestDTO;
+import com.example.hospital.dto.AdminPasswordResetDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -59,7 +64,7 @@ public class UserService {
      */
     public boolean isAdmin(String username) {
         User user = findByUsername(username);
-        return user != null && "ADMIN".equals(user.getRole());
+        return user != null && user.getRole() == Role.ADMIN;
     }
     
     /**
@@ -89,57 +94,47 @@ public class UserService {
     }
     
     /**
-     * 创建新用户
-     * @param username 用户名
-     * @param password 密码
-     * @param role 角色
-     * @return 保存后的用户对象
+     * 获取所有用户，并转换为 UserDTO 列表
+     * @return UserDTO 列表
      */
-    @Transactional
-    public User createUser(String username, String password, String role) {
-        User user = new User();
-        user.setUsername(username);
-        user.setPassword(password);
-        user.setRole(role);
-        return createUser(user);
+    public List<UserDTO> findAllUserDTOs() {
+        return userRepository.findAll().stream()
+                .map(this::convertToUserDTO)
+                .collect(Collectors.toList());
     }
     
     /**
-     * 创建新用户
-     * @param user 用户对象
+     * 创建新用户 (重载以接收 Role 枚举)
+     * @param username 用户名
+     * @param password 密码
+     * @param role 角色枚举
      * @return 保存后的用户对象
      */
     @Transactional
-    public User createUser(User user) {
-        // 加密密码
-        String encodedPassword = passwordEncoder.encode(user.getPassword());
-        System.out.println("创建用户: " + user.getUsername());
-        System.out.println("原始密码长度: " + user.getPassword().length());
-        System.out.println("加密密码长度: " + encodedPassword.length());
-        
-        user.setPassword(encodedPassword);
-        
-        // 设置默认角色
-        if (user.getRole() == null || user.getRole().isEmpty()) {
-            user.setRole("USER");
-        }
-        
+    public User createUser(String username, String password, Role role) {
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword(passwordEncoder.encode(password)); // Ensure password is encoded
+        user.setRole(role != null ? role : Role.USER); // Set role, default to USER if null
         return userRepository.save(user);
     }
     
     /**
-     * 更新用户角色
+     * 更新用户角色 (重载以接收 Role 枚举)
      * @param id 用户ID
-     * @param role 角色
+     * @param role 角色枚举
      * @return 更新后的用户对象
      */
     @Transactional
-    public User updateUserRole(Long id, String role) {
+    public User updateUserRole(Long id, Role role) {
         User user = findById(id);
         if (user == null) {
             throw new RuntimeException("用户不存在");
         }
-        
+        if (role == null) {
+            // 或者抛出异常，取决于业务逻辑是否允许角色为null
+            throw new IllegalArgumentException("角色不能为空"); 
+        }
         user.setRole(role);
         return userRepository.save(user);
     }
@@ -156,5 +151,78 @@ public class UserService {
         }
         
         userRepository.deleteById(id);
+    }
+
+    /**
+     * 修改用户密码
+     * @param username 用户名
+     * @param passwordChangeRequest 包含旧密码和新密码的DTO
+     * @throws RuntimeException 如果用户不存在或旧密码错误
+     */
+    @Transactional
+    public void changePassword(String username, PasswordChangeRequestDTO passwordChangeRequest) {
+        User user = findByUsername(username);
+        if (user == null) {
+            throw new RuntimeException("用户不存在: " + username);
+        }
+
+        // 验证旧密码
+        if (!passwordEncoder.matches(passwordChangeRequest.getOldPassword(), user.getPassword())) {
+            throw new RuntimeException("旧密码不正确");
+        }
+
+        // 验证通过，设置新密码
+        String encodedNewPassword = passwordEncoder.encode(passwordChangeRequest.getNewPassword());
+        user.setPassword(encodedNewPassword);
+
+        // 保存更新
+        userRepository.save(user);
+        
+        // 可选: 记录密码修改操作日志
+        // operationLogService.logPasswordChange(username);
+    }
+
+    /**
+     * 由管理员重置指定用户的密码
+     * @param userId 要重置密码的用户ID
+     * @param newPassword 新密码
+     * @throws RuntimeException 如果用户不存在
+     */
+    @Transactional
+    public void resetPasswordByAdmin(Long userId, String newPassword) {
+        User user = findById(userId); // Use findById for admin actions
+        if (user == null) {
+            throw new RuntimeException("用户不存在，ID: " + userId);
+        }
+
+        // 直接设置新密码，无需验证旧密码
+        String encodedNewPassword = passwordEncoder.encode(newPassword);
+        user.setPassword(encodedNewPassword);
+
+        // 保存更新
+        userRepository.save(user);
+        
+        // 可选: 记录密码重置操作日志
+        // operationLogService.logAdminPasswordReset(adminUsername, targetUsername);
+    }
+
+    /**
+     * 将 User 实体转换为 UserDTO
+     * @param user User 实体
+     * @return UserDTO 对象
+     */
+    public UserDTO convertToUserDTO(User user) {
+        if (user == null) {
+            return null;
+        }
+        return new UserDTO(
+                user.getId(),
+                user.getUsername(),
+                user.getRole() != null ? user.getRole().name() : null, // Convert enum to string
+                user.getRealName(),
+                user.getDepartment(),
+                user.getEmail(),
+                user.getPhone()
+        );
     }
 } 

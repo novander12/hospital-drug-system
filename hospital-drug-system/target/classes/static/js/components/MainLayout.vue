@@ -1,206 +1,260 @@
 <template>
   <el-container class="main-container">
-    <!-- 顶部导航栏 -->
-    <el-header class="app-header">
-      <div class="header-title">医院药品管理系统</div>
-      <div class="user-info">
-        <span>{{ userInfo.username }}</span>
-        <span class="user-role">({{ userInfo.role === 'ADMIN' ? '管理员' : '普通用户' }})</span>
-        <el-dropdown trigger="click" @command="handleCommand">
-          <el-avatar :size="32" :icon="UserFilled" />
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="profile">个人信息</el-dropdown-item>
-              <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-      </div>
-    </el-header>
-    
-    <!-- 内容区域 -->
-    <el-container>
-      <!-- 侧边菜单 -->
-      <el-aside width="200px" class="app-aside">
-        <el-menu
-          :default-active="activeMenu"
-          router
-          class="el-menu-vertical"
-        >
-          <el-menu-item index="/drug-management">
-            <el-icon><Box /></el-icon>
-            <span>药品管理</span>
-          </el-menu-item>
-          <el-menu-item index="/drug-statistics">
-            <el-icon><DataAnalysis /></el-icon>
-            <span>药品统计</span>
-          </el-menu-item>
-          <el-menu-item index="/drug-chart">
-            <el-icon><TrendCharts /></el-icon>
-            <span>库存走势</span>
-          </el-menu-item>
-          <el-menu-item index="/operation-log">
-            <el-icon><Document /></el-icon>
-            <span>操作日志</span>
-          </el-menu-item>
-          <el-menu-item index="/user-management" v-if="userInfo.role === 'ADMIN'">
-            <el-icon><User /></el-icon>
-            <span>用户管理</span>
-          </el-menu-item>
-          <el-menu-item index="/system-settings" v-if="userInfo.role === 'ADMIN'">
+    <!-- 侧边菜单 -->
+    <el-aside :width="isCollapse ? '64px' : '200px'" class="app-aside">
+      <el-menu
+        :default-active="activeMenu"
+        router
+        class="el-menu-vertical"
+        :collapse="isCollapse"
+        background-color="#304156"
+        text-color="#bfcbd9"
+        active-text-color="#409EFF"
+      >
+         <!-- Logo Area Removed -->
+         <!-- <div class="logo-container" :class="{'is-collapse': isCollapse}">
+            <img src="/assets/logo.png" class="logo" alt="Logo" v-if="!isCollapse"/>
+            <img src="/assets/logo-small.png" class="logo-small" alt="Logo" v-else/>
+            <span v-if="!isCollapse" class="system-title">医院药品系统</span>
+          </div> -->
+
+        <!-- 菜单项 -->
+        <el-menu-item index="/drug-management">
+          <el-icon><Box /></el-icon>
+          <template #title><span>药品管理</span></template>
+        </el-menu-item>
+        <el-menu-item index="/drug-statistics">
+          <el-icon><DataAnalysis /></el-icon>
+           <template #title><span>药品统计</span></template>
+        </el-menu-item>
+        <el-menu-item index="/prescriptions">
+          <el-icon><DocumentChecked /></el-icon>
+          <template #title><span>处方管理</span></template>
+        </el-menu-item>
+        <el-menu-item index="/inventory-report" v-if="isAdmin">
+          <el-icon><DataAnalysis /></el-icon>
+          <template #title><span>库存报告</span></template>
+        </el-menu-item>
+        <el-menu-item index="/drug-consumption-report" v-if="isAdmin">
+          <el-icon><Histogram /></el-icon>
+          <template #title><span>药品消耗统计</span></template>
+        </el-menu-item>
+        <el-menu-item index="/operation-log" v-if="canViewOperationLog">
+          <el-icon><Document /></el-icon>
+           <template #title><span>操作日志</span></template>
+        </el-menu-item>
+        <!-- Admin only menu items -->
+        <template v-if="isAdmin">
+           <el-menu-item index="/user-management">
+             <el-icon><User /></el-icon>
+             <template #title><span>用户管理</span></template>
+           </el-menu-item>
+           <el-menu-item index="/system-settings">
             <el-icon><Setting /></el-icon>
-            <span>系统设置</span>
-          </el-menu-item>
-        </el-menu>
-      </el-aside>
+            <template #title><span>系统设置</span></template>
+           </el-menu-item>
+        </template>
+        <!-- Add User Settings menu item accessible to all users -->
+        <el-menu-item index="/user-settings">
+          <el-icon><Setting /></el-icon>
+          <template #title><span>用户设置</span></template>
+        </el-menu-item>
+         <!-- Add other non-admin menu items here later -->
+      </el-menu>
+    </el-aside>
+    
+    <el-container>
+      <!-- 顶部导航栏 -->
+      <el-header class="app-header">
+         <div class="header-left">
+           <el-icon @click="toggleCollapse" class="collapse-icon">
+             <component :is="isCollapse ? 'Expand' : 'Fold'" />
+           </el-icon>
+           <span class="header-title">医院药品管理系统</span>
+         </div>
+        <div class="user-info">
+          <span>{{ userInfo.username }}</span>
+          <span class="user-role">({{ displayedUserRole }})</span>
+          <el-dropdown trigger="click" @command="handleCommand">
+            <el-avatar :size="32" :icon="UserFilled" style="cursor: pointer;"/>
+            <template #dropdown>
+              <!-- <el-dropdown-item command="profile">个人信息</el-dropdown-item> -->
+              <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+            </template>
+          </el-dropdown>
+        </div>
+      </el-header>
       
       <!-- 主内容区 -->
       <el-main class="app-main">
         <!-- 路由视图 -->
         <router-view v-slot="{ Component }">
-          <keep-alive>
+          <!-- <keep-alive> --> <!-- Temporarily remove keep-alive -->
             <component :is="Component" />
-          </keep-alive>
+          <!-- </keep-alive> -->
         </router-view>
       </el-main>
+
+      <!-- Footer -->
+       <el-footer class="app-footer">
+          © {{ new Date().getFullYear() }} 医院药品管理系统 | 版权所有
+        </el-footer>
     </el-container>
   </el-container>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, onActivated, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, onActivated, watch, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { UserFilled, User, Box, DataAnalysis, TrendCharts, Document, Setting } from '@element-plus/icons-vue'
-import axios from 'axios'
+import {
+   UserFilled, User, Box, DataAnalysis, Document, Setting, 
+   Expand, Fold, DocumentChecked, Histogram // Import collapse icons and new icon
+} from '@element-plus/icons-vue'
+// Removed axios import as it's likely handled within child components
 
-// 获取router和route实例
 const router = useRouter()
 const route = useRoute()
 
-// 用户信息
+// --- Moved state from App.vue --- 
+const isCollapse = ref(false)
 const userInfo = reactive({
   id: null,
   username: '',
   role: ''
 })
 
-// 当前激活的菜单，基于当前路由路径
-const activeMenu = computed(() => route.path)
+// Check if user is admin
+const isAdmin = computed(() => {
+   return userInfo.role && userInfo.role.toUpperCase() === 'ADMIN';
+});
 
-// 当前用户数据的版本，用于判断是否需要更新
-const userInfoVersion = ref(0)
+// New computed property to check if user can view logs
+const canViewOperationLog = computed(() => {
+  const role = userInfo.role ? userInfo.role.toUpperCase() : '';
+  return ['ADMIN', 'PHARMACIST', 'NURSE'].includes(role);
+});
 
-// 加载用户信息
+// New computed property for displaying user role name
+const displayedUserRole = computed(() => {
+  const role = userInfo.role ? userInfo.role.toUpperCase() : 'USER';
+  switch (role) {
+    case 'ADMIN': return '管理员';
+    case 'PHARMACIST': return '药师';
+    case 'NURSE': return '护士';
+    default: return '普通用户';
+  }
+});
+
+// Provide userInfo and isAdmin to child components
+provide('userInfo', userInfo);
+provide('isAdmin', isAdmin);
+
+// Active menu item based on current route
+const activeMenu = computed(() => route.path);
+
+// Load user info from localStorage
 const loadUserInfo = () => {
-  console.log('执行loadUserInfo函数...')
-  const userStr = localStorage.getItem('user')
-  console.log('从localStorage获取的原始数据:', userStr)
-  
-  // 保存上一次的用户信息以便对比
-  const oldUsername = userInfo.username
-  const oldRole = userInfo.role
-  
+  console.log('MainLayout: Loading user info...');
+  const userStr = localStorage.getItem('user');
+  const oldRole = userInfo.role; // Store old role to detect changes
   if (userStr) {
     try {
-      const user = JSON.parse(userStr)
-      console.log('解析后的用户信息:', user)
-      
-      // 重置用户信息
-      userInfo.id = null
-      userInfo.username = ''
-      userInfo.role = ''
-      
-      // 设置新数据 - 确保防止undefined或null值
-      userInfo.id = user.id || null
-      userInfo.username = user.username || '未知用户'
-      userInfo.role = user.role || 'USER'
-      
-      // 检测是否发生变化
-      if (oldUsername !== userInfo.username || oldRole !== userInfo.role) {
-        console.log('用户信息已变化!', oldUsername, '->', userInfo.username)
-        userInfoVersion.value++ // 增加版本号，触发依赖于它的computed属性重新计算
-        
-        // 如果是普通用户尝试访问管理员页面，重定向到药品管理页面
-        if (userInfo.role !== 'ADMIN' && 
-            (route.path === '/user-management' || route.path === '/system-settings')) {
-          console.warn('无权限访问:', route.path)
-          router.push('/drug-management')
-        }
+      const user = JSON.parse(userStr);
+      userInfo.id = user.id || null;
+      userInfo.username = user.username || '未知用户';
+      userInfo.role = user.role || 'USER';
+      console.log('MainLayout: User info loaded:', JSON.stringify(userInfo));
+      // Redirect if role changed and current route is not allowed
+      if (oldRole && oldRole !== userInfo.role && !isAdmin.value && (route.path === '/user-management' || route.path === '/system-settings')) {
+         console.warn('MainLayout: Role changed, redirecting from admin page.');
+         router.push('/drug-management');
       }
-      
-      console.log('设置后的userInfo状态:', JSON.stringify(userInfo))
     } catch (e) {
-      console.error('解析用户数据失败', e)
-      router.push('/login')
+      console.error('MainLayout: Failed to parse user data, logging out.', e);
+      logout(false); // Logout without confirmation
     }
   } else {
-    console.warn('未找到用户数据，重定向到登录页')
-    router.push('/login')
+    console.warn('MainLayout: No user data found, logging out.');
+    logout(false); // Logout without confirmation
   }
-}
+};
 
-// 添加一个方法来强制重新加载用户信息
-const forceReloadUserInfo = () => {
-  console.log('强制重新加载用户信息')
-  loadUserInfo()
-}
+// Toggle sidebar collapse state
+const toggleCollapse = () => {
+  isCollapse.value = !isCollapse.value;
+};
 
-// 监听路由变化，主动检查用户信息
-watch(() => route.path, (newPath, oldPath) => {
-  console.log('路由发生变化:', oldPath, '->', newPath)
-  loadUserInfo()
-})
-
-// 页面加载时获取用户信息
-onMounted(() => {
-  console.log('MainLayout组件已挂载，正在加载用户信息...')
-  loadUserInfo()
-  
-  // 增加事件监听，在localStorage变化时重新加载
-  window.addEventListener('storage', (event) => {
-    if (event.key === 'user') {
-      console.log('检测到localStorage中user数据变化')
-      loadUserInfo()
-    }
-  })
-  
-  // 每1秒检查一次用户信息是否有变化（比原来的5秒更频繁）
-  const intervalId = setInterval(loadUserInfo, 1000)
-  
-  // 组件卸载时清除定时器
-  onUnmounted(() => {
-    clearInterval(intervalId)
-  })
-})
-
-// 组件激活时也检查用户信息
-onActivated(() => {
-  console.log('MainLayout组件激活，检查用户信息')
-  loadUserInfo()
-})
-
-// 下拉菜单命令处理
+// Handle dropdown commands
 const handleCommand = (command) => {
   if (command === 'logout') {
-    ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }).then(() => {
-      // 清除本地存储
-      localStorage.removeItem('user')
-      localStorage.removeItem('token')
-      ElMessage.success('已退出登录')
-      router.push('/login')
-    }).catch(() => {})
+    logout(); // Logout with confirmation
   } else if (command === 'profile') {
-    ElMessageBox.alert(`用户ID: ${userInfo.id}<br>用户名: ${userInfo.username}<br>角色: ${userInfo.role}`, '用户信息', {
-      dangerouslyUseHTMLString: true,
-      confirmButtonText: '确定'
-    })
+    // Navigate to profile page or show modal
+    // Example: router.push('/profile');
+     ElMessageBox.alert(`用户ID: ${userInfo.id}<br>用户名: ${userInfo.username}<br>角色: ${userInfo.role}`, '用户信息', {
+       dangerouslyUseHTMLString: true,
+       confirmButtonText: '确定'
+     })
   }
-}
+};
+
+// Logout function
+const logout = (showConfirm = true) => {
+   const performLogout = () => {
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      ElMessage.success('已退出登录');
+      router.push('/login');
+   };
+
+   if (showConfirm) {
+      ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(performLogout).catch(() => {});
+   } else {
+      performLogout();
+   }
+};
+
+// --- Lifecycle and Watchers --- 
+let storageListener = null;
+let intervalId = null;
+
+onMounted(() => {
+  console.log('MainLayout Mounted');
+  loadUserInfo(); // Load user info initially
+  
+  // Listen for storage changes from other tabs
+  storageListener = (event) => {
+    if (event.key === 'user' || event.key === 'token') {
+      console.log('MainLayout: Detected storage change for', event.key);
+      loadUserInfo();
+    }
+  };
+  window.addEventListener('storage', storageListener);
+
+  // Periodically check user info (optional, less frequent check)
+  // intervalId = setInterval(loadUserInfo, 5000); 
+});
+
+onUnmounted(() => {
+  console.log('MainLayout Unmounted');
+  if (storageListener) {
+    window.removeEventListener('storage', storageListener);
+  }
+  // if (intervalId) {
+  //   clearInterval(intervalId);
+  // }
+});
+
+// Watch route changes to ensure user info is current (might be redundant with interval/storage listener)
+// watch(() => route.path, () => {
+//   loadUserInfo();
+// });
+
 </script>
 
 <style scoped>
@@ -208,21 +262,81 @@ const handleCommand = (command) => {
   height: 100vh;
 }
 
+.app-aside {
+  background-color: #304156; /* Dark background for sidebar */
+  transition: width 0.3s ease;
+  box-shadow: 2px 0 6px rgba(0,21,41,.35);
+  overflow-x: hidden; /* Hide horizontal scrollbar when collapsed */
+}
+
+.el-menu-vertical:not(.el-menu--collapse) {
+  width: 200px;
+}
+
+.el-menu {
+  border-right: none; /* Remove default border */
+}
+
+.logo-container {
+  height: 60px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Center items */
+  background-color: #2b2f3a; /* Slightly different background for logo area */
+  overflow: hidden;
+  white-space: nowrap; /* Prevent title wrapping */
+}
+.logo-container.is-collapse {
+   justify-content: center;
+}
+
+.logo {
+  height: 32px;
+  width: 32px;
+  vertical-align: middle;
+  /* margin-right: 12px; */
+}
+.logo-small {
+   height: 32px;
+   width: 32px;
+   vertical-align: middle;
+}
+
+.system-title {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  margin-left: 10px; /* Space between logo and title */
+}
+
 .app-header {
-  background-color: #409EFF;
-  color: white;
+  background-color: #fff;
+  color: #333;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
-  position: relative;
-  z-index: 10;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  height: 50px; /* Slightly smaller header */
+}
+
+.header-left {
+   display: flex;
+   align-items: center;
+}
+
+.collapse-icon {
+  font-size: 20px;
+  cursor: pointer;
+  margin-right: 15px;
+  color: #606266;
 }
 
 .header-title {
-  font-size: 18px;
-  font-weight: bold;
+  font-size: 18px; 
+  font-weight: bold; 
+  color: #303133;
 }
 
 .user-info {
@@ -233,21 +347,22 @@ const handleCommand = (command) => {
 
 .user-role {
   font-size: 12px;
-  opacity: 0.8;
-}
-
-.app-aside {
-  background-color: #fff;
-  border-right: 1px solid #e6e6e6;
-}
-
-.el-menu-vertical {
-  height: 100%;
-  border-right: none;
+  color: #909399;
 }
 
 .app-main {
-  background-color: #f5f7fa;
+  background-color: #f0f2f5; /* Lighter background for content */
   padding: 20px;
+  height: calc(100vh - 110px); /* Full height minus header and footer */
+  overflow-y: auto; /* Allow scrolling for content */
+}
+
+.app-footer {
+  background-color: #f0f2f5;
+  color: #909399;
+  text-align: center;
+  line-height: 60px;
+  font-size: 12px;
+  height: 60px;
 }
 </style> 

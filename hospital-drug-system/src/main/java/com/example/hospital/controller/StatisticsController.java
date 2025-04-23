@@ -4,6 +4,8 @@ import com.example.hospital.model.Drug;
 import com.example.hospital.model.StockHistory;
 import com.example.hospital.repository.DrugRepository;
 import com.example.hospital.repository.StockHistoryRepository;
+import com.example.hospital.service.DrugService;
+import com.example.hospital.dto.DrugDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,7 +29,7 @@ import java.util.stream.Collectors;
 public class StatisticsController {
 
     @Autowired
-    private DrugRepository drugRepository;
+    private DrugService drugService;
 
     @Autowired
     private StockHistoryRepository stockHistoryRepository;
@@ -37,17 +39,15 @@ public class StatisticsController {
      */
     @GetMapping("/category")
     public ResponseEntity<?> getStatisticsByCategory() {
-        List<Drug> drugs = drugRepository.findAll();
+        List<DrugDTO> drugs = drugService.getAllDrugs();
         
-        // 按类别分组并计数
         Map<String, Long> categoryCountMap = drugs.stream()
-                .filter(drug -> drug.getCategory() != null && !drug.getCategory().isEmpty())
+                .filter(dto -> dto.getCategory() != null && !dto.getCategory().isEmpty())
                 .collect(Collectors.groupingBy(
-                        Drug::getCategory,
+                        DrugDTO::getCategory,
                         Collectors.counting()
                 ));
         
-        // 转换为前端需要的格式
         List<Map<String, Object>> result = new ArrayList<>();
         categoryCountMap.forEach((category, count) -> {
             Map<String, Object> item = new HashMap<>();
@@ -65,19 +65,18 @@ public class StatisticsController {
      */
     @GetMapping("/inventory")
     public ResponseEntity<?> getInventoryStats() {
-        List<Drug> allDrugs = drugRepository.findAll();
+        List<DrugDTO> allDrugs = drugService.getAllDrugs();
         
         int totalDrugs = allDrugs.size();
         int lowStockCount = 0;
         int normalStockCount = 0;
         int highStockCount = 0;
         
-        // 库存阈值定义
         final int LOW_STOCK_THRESHOLD = 10;
         final int HIGH_STOCK_THRESHOLD = 100;
         
-        for (Drug drug : allDrugs) {
-            int stock = drug.getStock();
+        for (DrugDTO drug : allDrugs) {
+            int stock = drug.getTotalStock() != null ? drug.getTotalStock() : 0;
             if (stock < LOW_STOCK_THRESHOLD) {
                 lowStockCount++;
             } else if (stock > HIGH_STOCK_THRESHOLD) {
@@ -117,7 +116,6 @@ public class StatisticsController {
         LocalDate startDate = LocalDate.now().minusDays(days);
         List<StockHistory> stockHistoryList = stockHistoryRepository.findStockHistoryInRange(startDate);
         
-        // 转换为前端需要的格式
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         List<Map<String, Object>> result = stockHistoryList.stream().map(history -> {
             Map<String, Object> item = new HashMap<>();

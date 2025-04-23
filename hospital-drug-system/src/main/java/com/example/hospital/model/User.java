@@ -1,6 +1,8 @@
 package com.example.hospital.model;
 
 import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
@@ -15,7 +17,10 @@ public class User {
     private Long id;
     private String username;
     private String password;
-    private String role;
+
+    @Enumerated(EnumType.STRING)
+    private Role role;
+
     private String realName;
     private String department;
     private String email;
@@ -46,11 +51,11 @@ public class User {
         this.password = password;
     }
 
-    public String getRole() {
+    public Role getRole() {
         return role;
     }
 
-    public void setRole(String role) {
+    public void setRole(Role role) {
         this.role = role;
     }
 
@@ -91,7 +96,7 @@ public class User {
         return "User{" +
                 "id=" + id +
                 ", username='" + username + '\'' +
-                ", role='" + role + '\'' +
+                ", role='" + (role != null ? role.name() : "null") + '\'' +
                 ", realName='" + realName + '\'' +
                 ", department='" + department + '\'' +
                 '}';
